@@ -1,0 +1,176 @@
+@import "tailwindcss";
+
+/* ─────────────────────────────────────────────────────────────
+   SyntaxRay — тёмная тема по умолчанию.
+   Палитра рассчитана на многочасовую работу с кодом:
+   низкая яркость фона, холодный акцент (cyan/indigo),
+   контраст текста ≥ 7:1 по WCAG для основного слоя.
+   ───────────────────────────────────────────────────────────── */
+@theme {
+  --color-ink-950: #05070d;
+  --color-ink-900: #080b14;
+  --color-ink-850: #0b0f1a;
+  --color-ink-800: #101524;
+  --color-ink-700: #1a2136;
+  --color-ink-600: #2a3350;
+  --color-ray-300: #7ce9ff;
+  --color-ray-400: #38d3f5;
+  --color-ray-500: #12b5df;
+  --color-violet-ray: #8b7bff;
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body {
+  background-color: var(--color-ink-950);
+  color: #e6ecff;
+}
+
+body {
+  min-height: 100vh;
+  background-image:
+    radial-gradient(60rem 40rem at 12% -10%, rgba(56, 211, 245, 0.13), transparent 60%),
+    radial-gradient(50rem 36rem at 92% 0%, rgba(139, 123, 255, 0.14), transparent 55%),
+    radial-gradient(40rem 30rem at 50% 110%, rgba(18, 181, 223, 0.08), transparent 60%);
+  background-attachment: fixed;
+}
+
+/* Тонкая сетка «инженерного чертежа» */
+.grid-backdrop::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(to right, rgba(148, 176, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(148, 176, 255, 0.045) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: radial-gradient(ellipse at 50% 0%, black 0%, transparent 75%);
+}
+
+@utility glass {
+  background: linear-gradient(150deg, rgba(23, 30, 51, 0.72), rgba(10, 14, 25, 0.62));
+  border: 1px solid rgba(140, 168, 226, 0.13);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+}
+
+@utility glass-strong {
+  background: linear-gradient(150deg, rgba(29, 38, 63, 0.9), rgba(11, 16, 28, 0.86));
+  border: 1px solid rgba(150, 180, 240, 0.18);
+  backdrop-filter: blur(24px) saturate(150%);
+  -webkit-backdrop-filter: blur(24px) saturate(150%);
+}
+
+@utility text-gradient {
+  background: linear-gradient(96deg, #7ce9ff 0%, #a9b6ff 48%, #d9c2ff 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+@utility focus-ray {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(56, 211, 245, 0.55);
+}
+
+/* Скроллбары в тон интерфейсу */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(120, 150, 210, 0.22);
+  border-radius: 99px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(140, 175, 240, 0.4);
+  background-clip: content-box;
+}
+
+/* Skeleton-загрузчики (ожидание ответа ИИ) */
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: rgba(120, 150, 210, 0.08);
+  border-radius: 0.65rem;
+}
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(160, 195, 255, 0.14),
+    transparent
+  );
+  animation: shimmer 1.7s infinite;
+}
+
+/* Подсветка строк с замечаниями в Monaco Editor */
+.sr-glyph-critical {
+  background: #ff5d7a;
+  border-radius: 2px;
+  margin-left: 6px;
+  width: 4px !important;
+}
+.sr-glyph-major {
+  background: #ffb454;
+  border-radius: 2px;
+  margin-left: 6px;
+  width: 4px !important;
+}
+.sr-glyph-minor {
+  background: #38d3f5;
+  border-radius: 2px;
+  margin-left: 6px;
+  width: 4px !important;
+}
+.sr-glyph-info {
+  background: #8b7bff;
+  border-radius: 2px;
+  margin-left: 6px;
+  width: 4px !important;
+}
+.sr-line-critical {
+  background: rgba(255, 93, 122, 0.09);
+}
+.sr-line-major {
+  background: rgba(255, 180, 84, 0.08);
+}
+.sr-line-minor {
+  background: rgba(56, 211, 245, 0.06);
+}
+.sr-line-info {
+  background: rgba(139, 123, 255, 0.06);
+}
+.sr-line-active {
+  background: rgba(56, 211, 245, 0.15) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}

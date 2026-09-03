@@ -1,0 +1,75 @@
+# ─────────────────────────────────────────────────────────────
+# SyntaxRay — локальная инфраструктура.
+#
+#   docker build -t syntaxray/sandbox:latest -f backend/sandbox.Dockerfile backend
+#   docker compose up --build
+#
+# Фронтенд (Next.js) при этом можно запускать как локально (npm run dev),
+# так и на Vercel — достаточно указать SANDBOX_API_URL на этот раннер.
+# ─────────────────────────────────────────────────────────────
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: syntaxray-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: syntaxray
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: syntaxray-api
+    restart: unless-stopped
+    environment:
+      # Ключ подставляется из .env хоста и НИКОГДА не попадает в образ
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
+      SANDBOX_IMAGE: syntaxray/sandbox:latest
+      SANDBOX_API_TOKEN: ${SANDBOX_API_TOKEN:-}
+      SANDBOX_MEM_LIMIT: 512m
+      CORS_ORIGINS: ${CORS_ORIGINS:-*}
+    ports:
+      - "8000:8000"
+    volumes:
+      # Docker-in-Docker: API поднимает одноразовые контейнеры песочницы.
+      # В production используйте отдельный сокет-прокси с ограниченными правами.
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # Опционально: фронтенд в контейнере (в production он живёт на Vercel)
+  web:
+    image: node:22-alpine
+    container_name: syntaxray-web
+    profiles: ["local-web"]
+    working_dir: /app
+    command: sh -c "npm install && npm run dev -- --hostname 0.0.0.0"
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/syntaxray
+      SANDBOX_API_URL: http://api:8000
+      SANDBOX_API_TOKEN: ${SANDBOX_API_TOKEN:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app
+      - /app/node_modules
+    depends_on:
+      - api
+      - postgres
+
+volumes:
+  pgdata:
