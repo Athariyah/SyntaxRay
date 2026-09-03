@@ -68,11 +68,22 @@ backend/
 ## 3. Быстрый старт
 
 ```bash
-cp .env.example .env.local
 npm install
-npx drizzle-kit push          # создать таблицы
 npm run dev                   # http://localhost:3000
 ```
+
+Сайт работает сразу: без `DATABASE_URL` подключается встроенная PGlite (PostgreSQL в Wasm),
+данные лежат в `./.pglite`, а миграции из `./drizzle` применяются автоматически.
+
+Для внешней PostgreSQL (Neon / Supabase / локальный контейнер):
+
+```bash
+cp .env.example .env.local    # прописать DATABASE_URL
+npx drizzle-kit push          # создать таблицы во внешней БД
+npm run dev
+```
+
+Изменили `src/db/schema.ts`? Обновите миграции: `npx drizzle-kit generate`.
 
 Бэкенд и песочница:
 
@@ -88,7 +99,7 @@ curl http://localhost:8000/health     # {"status":"ok","docker":true,"gemini":tr
 
 | Переменная | Назначение | Обязательна |
 |---|---|---|
-| `DATABASE_URL` | PostgreSQL (Neon / Supabase / Vercel Postgres) | да |
+| `DATABASE_URL` | PostgreSQL (Neon / Supabase / Vercel Postgres); без неё — встроенная PGlite | только для внешней БД |
 | `GEMINI_API_KEY` | Ключ Google AI Studio; читается только на сервере | для ИИ-ревью |
 | `GEMINI_MODEL` | По умолчанию `gemini-2.5-flash` | нет |
 | `SANDBOX_API_URL` | URL FastAPI-раннера с Docker-песочницей | нет |

@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { desc, sql } from "drizzle-orm";
-import { db } from "@/db";
+import { count, desc, eq, sql } from "drizzle-orm";
+import { getDb } from "@/db";
 import { findings, submissions } from "@/db/schema";
 import { Reveal } from "@/components/reveal";
 import { SubmissionsTable, type SubmissionRow } from "@/components/submissions-table";
@@ -8,6 +8,7 @@ import { SubmissionsTable, type SubmissionRow } from "@/components/submissions-t
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
+  const db = await getDb();
   const rows = await db
     .select({
       publicId: submissions.publicId,
@@ -22,15 +23,15 @@ export default async function DashboardPage() {
       verdict: submissions.verdict,
       engine: submissions.engine,
       createdAt: submissions.createdAt,
-      findingsCount: sql<number>`(
-        select count(*)::int from ${findings} where ${findings.submissionId} = ${submissions.id}
-      )`,
-      criticalCount: sql<number>`(
-        select count(*)::int from ${findings}
-        where ${findings.submissionId} = ${submissions.id} and ${findings.severity} = 'critical'
-      )`,
+      // См. комментарий в api/submissions/route.ts: коррелированный
+      // подзапрос с ${submissions.id} drizzle квалифицирует неверно,
+      // поэтому считаем агрегаты через LEFT JOIN + GROUP BY по PK.
+      findingsCount: count(findings.id),
+      criticalCount: sql<number>`count(*) filter (where ${findings.severity} = 'critical')::int`,
     })
     .from(submissions)
+    .leftJoin(findings, eq(findings.submissionId, submissions.id))
+    .groupBy(submissions.id)
     .orderBy(desc(submissions.createdAt))
     .limit(60);
 

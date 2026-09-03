@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { count } from "drizzle-orm";
-import { db } from "@/db";
+import { getDb } from "@/db";
 import { findings, submissions } from "@/db/schema";
 import { Reveal } from "@/components/reveal";
 import { isGeminiConfigured } from "@/lib/ai/gemini";
@@ -48,6 +48,7 @@ const PIPELINE = [
 ];
 
 export default async function LandingPage() {
+  const db = await getDb();
   const [submissionStats] = await db.select({ value: count() }).from(submissions);
   const [findingStats] = await db.select({ value: count() }).from(findings);
   const geminiOn = isGeminiConfigured();

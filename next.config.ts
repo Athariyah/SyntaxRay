@@ -9,7 +9,8 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
 
   // Monaco Editor тянет крупные воркеры — выносим их из серверного бандла.
-  serverExternalPackages: ["monaco-editor"],
+  // PGlite (встроенный PostgreSQL в Wasm) должен резолвиться из node_modules.
+  serverExternalPackages: ["monaco-editor", "@electric-sql/pglite"],
 
   experimental: {
     // Уменьшаем размер клиентского бандла Framer Motion.

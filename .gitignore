@@ -1,0 +1,26 @@
+# Зависимости
+node_modules/
+
+# Сборка Next.js
+.next/
+out/
+
+# Встроенная БД PGlite (локальные данные)
+.pglite/
+
+# Окружение
+.env
+.env.local
+.env.*.local
+
+# TypeScript / Next.js служебные
+next-env.d.ts
+*.tsbuildinfo
+
+# Python
+__pycache__/
+*.pyc
+
+# Логи и артефакты
+*.log
+.vercel

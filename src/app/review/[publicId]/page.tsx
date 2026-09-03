@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { asc, eq } from "drizzle-orm";
-import { db } from "@/db";
+import { getDb } from "@/db";
 import { findings as findingsTable, reviewFiles, submissions } from "@/db/schema";
 import { Reveal } from "@/components/reveal";
 import { ScoreRing } from "@/components/review/score-ring";
@@ -19,6 +19,7 @@ export default async function ReviewPage({
   params: Promise<{ publicId: string }>;
 }) {
   const { publicId } = await params;
+  const db = await getDb();
 
   const [submission] = await db
     .select()

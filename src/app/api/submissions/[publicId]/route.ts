@@ -1,7 +1,7 @@
 /** GET / DELETE конкретной заявки по публичному идентификатору. */
 import { NextResponse } from "next/server";
 import { asc, eq } from "drizzle-orm";
-import { db } from "@/db";
+import { getDb } from "@/db";
 import { findings as findingsTable, reviewFiles, submissions } from "@/db/schema";
 
 export const runtime = "nodejs";
@@ -12,6 +12,7 @@ export async function GET(
   { params }: { params: Promise<{ publicId: string }> },
 ) {
   const { publicId } = await params;
+  const db = await getDb();
   const [submission] = await db
     .select()
     .from(submissions)
@@ -43,6 +44,7 @@ export async function DELETE(
   { params }: { params: Promise<{ publicId: string }> },
 ) {
   const { publicId } = await params;
+  const db = await getDb();
   const deleted = await db
     .delete(submissions)
     .where(eq(submissions.publicId, publicId))

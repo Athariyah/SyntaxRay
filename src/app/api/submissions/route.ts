@@ -3,8 +3,8 @@
  * GET  /api/submissions — список последних заявок для дашборда.
  */
 import { NextResponse } from "next/server";
-import { desc, sql } from "drizzle-orm";
-import { db } from "@/db";
+import { count, desc, eq, sql } from "drizzle-orm";
+import { getDb } from "@/db";
 import { findings as findingsTable, reviewFiles, submissions } from "@/db/schema";
 import { analyzeSubmission } from "@/lib/analyzer/pipeline";
 import { aggregateLanguage, detectLanguage } from "@/lib/languages";
@@ -23,6 +23,7 @@ function publicId(): string {
 }
 
 export async function GET() {
+  const db = await getDb();
   const rows = await db
     .select({
       publicId: submissions.publicId,
@@ -37,15 +38,16 @@ export async function GET() {
       verdict: submissions.verdict,
       engine: submissions.engine,
       createdAt: submissions.createdAt,
-      findingsCount: sql<number>`(
-        select count(*)::int from ${findingsTable} where ${findingsTable.submissionId} = ${submissions.id}
-      )`,
-      criticalCount: sql<number>`(
-        select count(*)::int from ${findingsTable}
-        where ${findingsTable.submissionId} = ${submissions.id} and ${findingsTable.severity} = 'critical'
-      )`,
+      // Агрегация через LEFT JOIN + GROUP BY по первичному ключу.
+      // (Коррелированный подзапрос с ${submissions.id} внутри sql-поля
+      // здесь не подходит: drizzle схлопывает квалификацию колонки до
+      // "id", и ссылка уходит на findings.id вместо submissions.id.)
+      findingsCount: count(findingsTable.id),
+      criticalCount: sql<number>`count(*) filter (where ${findingsTable.severity} = 'critical')::int`,
     })
     .from(submissions)
+    .leftJoin(findingsTable, eq(findingsTable.submissionId, submissions.id))
+    .groupBy(submissions.id)
     .orderBy(desc(submissions.createdAt))
     .limit(50);
 
@@ -110,6 +112,7 @@ export async function POST(request: Request) {
   const language = aggregateLanguage(files.map((f) => f.language));
   const title = (body.title?.trim() || files[0].path).slice(0, 200);
   const id = publicId();
+  const db = await getDb();
 
   const [created] = await db
     .insert(submissions)
@@ -170,7 +173,7 @@ export async function POST(request: Request) {
         durationMs: Date.now() - startedAt,
         completedAt: new Date(),
       })
-      .where(sql`${submissions.id} = ${created.id}`);
+      .where(eq(submissions.id, created.id));
 
     return NextResponse.json({ publicId: id, score: report.score, verdict: report.verdict });
   } catch (error) {
@@ -178,7 +181,7 @@ export async function POST(request: Request) {
     await db
       .update(submissions)
       .set({ status: "failed", summary: error instanceof Error ? error.message : "Ошибка анализа" })
-      .where(sql`${submissions.id} = ${created.id}`);
+      .where(eq(submissions.id, created.id));
     return NextResponse.json({ error: "Анализ завершился с ошибкой", publicId: id }, { status: 500 });
   }
 }
