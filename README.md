@@ -119,7 +119,10 @@ vercel env add SANDBOX_API_URL production   # опционально
 vercel --prod
 ```
 
-`vercel.json` увеличивает `maxDuration` для `/api/submissions` до 120 c (ревью синхронное).
+`vercel.json` описывает два сервиса: `frontend` (Next.js, корень репозитория) и `backend`
+(FastAPI-песочница, каталог `backend/`), и маршрутизирует `/api/backend/*` на FastAPI.
+Лимит `maxDuration` для `/api/submissions` (120 c, ревью синхронное) задан в коде роута
+(`export const maxDuration = 120`).
 Для планов без длинных функций вынесите анализ в очередь или полностью на FastAPI-раннер.
 
 ## 6. Безопасность песочницы
