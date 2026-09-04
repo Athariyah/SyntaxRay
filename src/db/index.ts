@@ -127,11 +127,35 @@ async function createEmbeddedDb(): Promise<Db> {
   return drizzlePgLite(fallback) as unknown as Db;
 }
 
+function resolveDatabaseUrl(): string | undefined {
+  // Vercel Postgres может прокидывать POSTGRES_URL / POSTGRES_PRISMA_URL
+  // вместо DATABASE_URL — поддерживаем все варианты, чтобы деплой не падал
+  // с «База данных недоступна» при корректно подключённом Vercel Postgres.
+  const candidates = [
+    process.env.DATABASE_URL,
+    process.env.POSTGRES_URL,
+    process.env.POSTGRES_PRISMA_URL,
+    process.env.POSTGRES_URL_NON_POOLING,
+  ];
+  for (const c of candidates) {
+    const v = c?.trim();
+    if (v) return v;
+  }
+  return undefined;
+}
+
 /** Создать клиент Drizzle поверх выбранного движка. */
 async function createDb(): Promise<Db> {
-  const databaseUrl = process.env.DATABASE_URL?.trim();
+  const databaseUrl = resolveDatabaseUrl();
   if (databaseUrl) {
     return createPostgresDb(databaseUrl);
+  }
+  // На Vercel без внешней БД предупреждаем явно — PGlite в /tmp эфемерен.
+  if (process.env.VERCEL) {
+    console.warn(
+      "[db] DATABASE_URL/POSTGRES_URL не задан — используется эфемерная PGlite в /tmp. " +
+        "Для продакшена задайте DATABASE_URL в Vercel Environment Variables.",
+    );
   }
   return createEmbeddedDb();
 }

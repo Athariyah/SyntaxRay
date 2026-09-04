@@ -8,13 +8,17 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
 
-  // Monaco Editor тянет крупные воркеры — выносим их из серверного бандла.
-  // PGlite (встроенный PostgreSQL в Wasm) должен резолвиться из node_modules.
-  serverExternalPackages: ["monaco-editor", "@electric-sql/pglite"],
+  // PGlite (Wasm) должен оставаться внешним — иначе сборщик пытается
+  // заинлайнить .wasm и падает на Vercel (function size / ESM parsing).
+  // Monaco Editor — клиентский пакет, на сервере не используется.
+  serverExternalPackages: ["@electric-sql/pglite"],
 
-  outputFileTracingIncludes: {
-    "/*": ["./drizzle/**/*"],
-  },
+  // Drizzle-миграции не нужны в runtime: схема создаётся через INIT_SCHEMA_SQL
+  // (см. src/db/index.ts). Если решите отдавать SQL-файлы рантайму,
+  // раскомментируйте и укажите узкий префикс, чтобы не раздувать каждый лямбда-бандл:
+  // outputFileTracingIncludes: {
+  //   "/api/**/*": ["./drizzle/**/*"],
+  // },
 
   experimental: {
     // Уменьшаем размер клиентского бандла Framer Motion.

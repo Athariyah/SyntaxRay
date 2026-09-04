@@ -8,7 +8,9 @@
 import { SYNTAXRAY_SYSTEM_PROMPT } from "@/lib/ai/system-prompt";
 import type { AnalysisFinding, SandboxReport, SourceFile } from "@/lib/types";
 
-const MODEL = process.env.GEMINI_MODEL ?? "gemini-2.5-flash";
+function getModel(): string {
+  return process.env.GEMINI_MODEL ?? "gemini-2.5-flash";
+}
 const ENDPOINT = (model: string) =>
   `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
 
@@ -225,7 +227,7 @@ export async function requestGeminiReview(params: {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 90_000);
   try {
-    const response = await fetch(ENDPOINT(MODEL), {
+    const response = await fetch(ENDPOINT(getModel()), {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
       body: JSON.stringify(body),
@@ -249,4 +251,8 @@ export async function requestGeminiReview(params: {
   }
 }
 
-export const GEMINI_MODEL_NAME = MODEL;
+/** Имя модели на момент вызова — читается лениво, чтобы Vercel не инлайнил env на этапе сборки. */
+export const GEMINI_MODEL_NAME = getModel();
+export function getGeminiModelName(): string {
+  return getModel();
+}

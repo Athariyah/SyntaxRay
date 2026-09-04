@@ -2,3 +2,8 @@ backend/
 docker-compose.yml
 .pglite/
 *.log
+README.md
+drizzle/meta
+coverage
+.next
+.vercel
