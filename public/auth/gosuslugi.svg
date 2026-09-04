@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0.38" stop-color="#0D5FAF"/>
+      <stop offset="0.62" stop-color="#E63E5E"/>
+    </linearGradient>
+  </defs>
+  <!-- открытый шестиугольник: разрыв на левой стороне -->
+  <path d="M100 235 L455 40 Q512 12 569 40 L905 225 Q950 250 950 300 L950 724 Q950 774 905 799 L569 984 Q512 1012 455 984 L100 789"
+        fill="none" stroke="url(#g)" stroke-width="58" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="48" y="465" font-family="'Segoe UI', Roboto, Arial, sans-serif" font-weight="700" font-size="228" letter-spacing="-4" fill="#0D5FAF">гос</text>
+  <text x="48" y="663" font-family="'Segoe UI', Roboto, Arial, sans-serif" font-weight="700" font-size="200" letter-spacing="-6" fill="#E63E5E">услуги</text>
+</svg>

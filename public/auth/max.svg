@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 1280">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#3FD3FF"/>
+      <stop offset="0.35" stop-color="#3B8BFF"/>
+      <stop offset="0.6" stop-color="#4A38D8"/>
+      <stop offset="1" stop-color="#9B3BD6"/>
+    </linearGradient>
+    <linearGradient id="in" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#3FA0FF"/>
+      <stop offset="0.5" stop-color="#4A5BF0"/>
+      <stop offset="1" stop-color="#4A2FD0"/>
+    </linearGradient>
+  </defs>
+  <rect width="1280" height="1280" rx="300" fill="url(#bg)"/>
+  <!-- белое кольцо-«пузырь» с хвостиком слева снизу -->
+  <path fill="#fff" fill-rule="evenodd"
+        d="M640 150 C915 150 1130 365 1130 640 C1130 915 915 1130 640 1130 C555 1130 480 1110 415 1075 C360 1105 300 1125 245 1125 C220 1125 215 1105 222 1085 C240 1030 232 960 210 900 C170 820 150 735 150 640 C150 365 365 150 640 150 Z
+           M640 395 C505 395 395 505 395 640 C395 745 425 830 460 885 C480 880 505 860 520 840 C555 865 595 885 640 885 C775 885 885 775 885 640 C885 505 775 395 640 395 Z"/>
+  <!-- внутренний круг с градиентом -->
+  <path fill="url(#in)"
+        d="M640 395 C775 395 885 505 885 640 C885 775 775 885 640 885 C595 885 555 865 520 840 C505 860 480 880 460 885 C425 830 395 745 395 640 C395 505 505 395 640 395 Z"/>
+</svg>
