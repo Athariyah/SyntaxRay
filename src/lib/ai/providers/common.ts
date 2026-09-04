@@ -21,6 +21,8 @@ export interface AIReview {
   actionItems: string[];
   sections: Array<{ title: string; body: string }>;
   findings: AnalysisFinding[];
+  /** Мнение модели о доле ИИ-сгенерированного кода. */
+  aiGenerated?: { probability: number; reasoning: string } | null;
 }
 
 export function renderFiles(files: SourceFile[], budget = 46_000): string {
@@ -89,7 +91,7 @@ ${renderSandbox(params.sandbox)}
 ## ИСХОДНЫЙ КОД (строки пронумерованы; используй ИМЕННО эти номера)
 ${renderFiles(params.files)}
 
-Проведи полное академическое ревью по всем осям A–F и верни строго JSON по заданной схеме.`;
+Проведи полное академическое ревью по всем осям A–F (включая ось G — оценку ИИ-генерации) и верни строго JSON по заданной схеме.`;
 }
 
 export function parseJsonBlock(text: string): unknown {
@@ -184,6 +186,18 @@ export function normalizeAIResponse(raw: unknown, files: SourceFile[]): AIReview
     actionItems: toStringArray(data.actionItems),
     sections,
     findings,
+    aiGenerated: parseAIGenerated(data.aiGenerated),
+  };
+}
+
+export function parseAIGenerated(value: unknown): { probability: number; reasoning: string } | null {
+  if (!value || typeof value !== "object") return null;
+  const v = value as Record<string, unknown>;
+  const p = Number(v.probability);
+  if (!Number.isFinite(p)) return null;
+  return {
+    probability: Math.max(0, Math.min(100, Math.round(p))),
+    reasoning: typeof v.reasoning === "string" ? v.reasoning.slice(0, 600) : "",
   };
 }
 

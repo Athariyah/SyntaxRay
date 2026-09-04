@@ -101,8 +101,8 @@ export function FullAuthPanel() {
 }
 
 function providerIconBackground(name: string, color: string): string {
-  if (name === "gosuslugi") return "linear-gradient(160deg,#0A5C9E 0%,#0051A2 100%)";
-  if (name === "max") return "linear-gradient(135deg,#4A90E2 0%,#9B59D6 100%)";
+  if (name === "gosuslugi") return "#FFFFFF";
+  if (name === "max") return "linear-gradient(135deg,#2FA4FF 0%,#4A62F5 55%,#8B3DFF 100%)";
   return color;
 }
 
@@ -118,23 +118,40 @@ function ProviderIcon({ name }: { name: string }) {
     );
   }
   if (name === "max") {
+    // Логотип MAX: белый «пузырь» диалога — кольцо с хвостиком в левом нижнем углу.
     return (
-      <svg viewBox="0 0 28 28" className="h-7 w-7 text-white" fill="none" aria-hidden="true">
+      <svg viewBox="0 0 28 28" className="h-7 w-7" aria-hidden="true">
         <path
-          d="M7 10a2.8 2.8 0 0 1 2.8-2.8h8.4a2.8 2.8 0 0 1 2.8 2.8v5a2.8 2.8 0 0 1-2.8 2.8h-3.6l-3 2.8v-2.8h-1.8A2.8 2.8 0 0 1 7 15v-5Z"
-          stroke="currentColor"
-          strokeWidth="2.2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
+          fill="#fff"
+          fillRule="evenodd"
+          d="M14 4.5a9.5 9.5 0 1 1-6.9 16.03L4.6 22.9c-.7.5-1.6-.1-1.5-.9l.7-4.3A9.5 9.5 0 0 1 14 4.5Zm0 5.1a4.4 4.4 0 1 0 0 8.8 4.4 4.4 0 0 0 0-8.8Z"
         />
       </svg>
     );
   }
   if (name === "gosuslugi") {
+    // Логотип Госуслуг: шестиугольный контур с сине-красным градиентом и надпись «гос/услуги».
     return (
-      <svg viewBox="0 0 28 28" className="h-7 w-7 text-white" fill="currentColor" fillRule="evenodd" aria-hidden="true">
-        <circle cx="14" cy="6.9" r="3.1" />
-        <path d="M8 10.3h12v1.6c0 3.7-2.7 6.6-6 6.6s-6-2.9-6-6.6v-1.6Zm4.2 1.1h3.6v3.4a1.8 1.8 0 0 1-3.6 0v-3.4Z" />
+      <svg viewBox="0 0 28 28" className="h-9 w-9" aria-hidden="true">
+        <defs>
+          <linearGradient id="gu-grad" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stopColor="#0D4CD3" />
+            <stop offset="1" stopColor="#EE3F58" />
+          </linearGradient>
+        </defs>
+        <path
+          d="M14 1.6 25.2 7.9v12.2L14 26.4 2.8 20.1V7.9Z"
+          fill="none"
+          stroke="url(#gu-grad)"
+          strokeWidth="1.7"
+          strokeLinejoin="round"
+        />
+        <text x="14" y="12.6" textAnchor="middle" fontFamily="Arial, Helvetica, sans-serif" fontWeight="700" fontSize="5.6" fill="#0D4CD3">
+          гос
+        </text>
+        <text x="14" y="18.6" textAnchor="middle" fontFamily="Arial, Helvetica, sans-serif" fontWeight="700" fontSize="4.6" letterSpacing="-0.1" fill="#EE3F58">
+          услуги
+        </text>
       </svg>
     );
   }

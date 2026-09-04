@@ -12,6 +12,7 @@
  * чтобы Monaco Editor мог отрисовать inline-маркеры.
  */
 import type { AnalysisFinding, SandboxReport, SourceFile } from "@/lib/types";
+import { languageFamily } from "@/lib/languages";
 
 interface FunctionSpan {
   name: string;
@@ -24,17 +25,33 @@ interface FunctionSpan {
   body: string[];
 }
 
-const C_LIKE = new Set(["c", "cpp"]);
+/** Языки с фигурными скобками и комментариями `//` — C, C++, Java, Go, Rust, JS/TS и т.д. */
+const C_LIKE = {
+  has: (language: string) => languageFamily(language) === "c-like",
+};
+/** Языки с блоками по отступам и комментариями `#`. */
+const HASH_COMMENT = {
+  has: (language: string) => {
+    const fam = languageFamily(language);
+    return fam === "python-like" || fam === "ruby-like";
+  },
+};
+/** Языки, чьи функции извлекаются по отступу как в Python. */
+const INDENT_BLOCKS = new Set(["python"]);
 
 function stripInlineComment(line: string): string {
-  return line.replace(/\/\/.*$/, "").replace(/#.*$/, "");
+  return line.replace(/\/\/.*$/, "").replace(/#.*$/, "").replace(/--.*$/, "");
 }
 
 function isCommentLine(line: string, language: string): boolean {
   const t = line.trim();
   if (!t) return false;
-  if (C_LIKE.has(language)) return t.startsWith("//") || t.startsWith("/*") || t.startsWith("*");
-  if (language === "python") return t.startsWith("#");
+  if (C_LIKE.has(language)) return t.startsWith("//") || t.startsWith("/*") || t.startsWith("*") || t.startsWith("///");
+  if (HASH_COMMENT.has(language)) return t.startsWith("#") || t.startsWith("=begin");
+  if (language === "sql" || language === "lua" || language === "haskell") return t.startsWith("--");
+  if (language === "pascal") return t.startsWith("{") || t.startsWith("//") || t.startsWith("(*");
+  if (language === "matlab") return t.startsWith("%");
+  if (language === "fortran") return t.startsWith("!");
   return false;
 }
 
@@ -43,7 +60,7 @@ function extractFunctions(file: SourceFile): FunctionSpan[] {
   const lines = file.content.split("\n");
   const spans: FunctionSpan[] = [];
 
-  if (file.language === "python") {
+  if (INDENT_BLOCKS.has(file.language)) {
     let current: { name: string; start: number; indent: number; body: string[] } | null = null;
     const flush = (endLine: number) => {
       if (!current) return;
@@ -81,13 +98,12 @@ function extractFunctions(file: SourceFile): FunctionSpan[] {
 
   if (!C_LIKE.has(file.language)) return spans;
 
-  const signature =
-    /^[A-Za-z_][\w:<>,\s*&\]\[]*\s+\**([A-Za-z_][A-Za-z0-9_]*)\s*\([^;]*\)\s*(const\s*)?\{?\s*$/;
+  const signature = C_LIKE_SIGNATURES[file.language] ?? DEFAULT_C_LIKE_SIGNATURE;
   for (let i = 0; i < lines.length; i += 1) {
     const line = stripInlineComment(lines[i]);
     const match = signature.exec(line.trim());
     if (!match) continue;
-    if (/^(if|for|while|switch|return|else|catch)\b/.test(line.trim())) continue;
+    if (/^(if|for|while|switch|return|else|catch|foreach|when|match|new|throw)\b/.test(line.trim())) continue;
     // Ищем открывающую скобку тела
     let depth = 0;
     let started = false;
@@ -107,7 +123,7 @@ function extractFunctions(file: SourceFile): FunctionSpan[] {
     }
     if (!started) continue;
     spans.push({
-      name: match[1],
+      name: match[1] ?? match[2] ?? "anonymous",
       file: file.path,
       startLine: i + 1,
       endLine: j + 1,
@@ -120,6 +136,27 @@ function extractFunctions(file: SourceFile): FunctionSpan[] {
   }
   return spans;
 }
+
+/** Сигнатура функции C/C++: `тип имя(args) {`. */
+const DEFAULT_C_LIKE_SIGNATURE =
+  /^[A-Za-z_][\w:<>,\s*&\]\[]*\s+\**([A-Za-z_][A-Za-z0-9_]*)\s*\([^;]*\)\s*(const\s*)?\{?\s*$/;
+
+/** Сигнатуры функций для остальных C-подобных языков (ключевое слово + имя). */
+const C_LIKE_SIGNATURES: Record<string, RegExp> = {
+  go: /^func\s+(?:\([^)]*\)\s*)?([A-Za-z_][A-Za-z0-9_]*)\s*\(/,
+  rust: /^(?:pub(?:\([^)]*\))?\s+)?(?:async\s+)?(?:unsafe\s+)?fn\s+([A-Za-z_][A-Za-z0-9_]*)/,
+  kotlin: /^(?:(?:public|private|protected|internal|override|open|suspend|inline)\s+)*fun\s+(?:<[^>]*>\s*)?(?:[\w.]+\.)?([A-Za-z_][A-Za-z0-9_]*)\s*\(/,
+  swift: /^(?:(?:public|private|fileprivate|internal|static|override|mutating)\s+)*func\s+([A-Za-z_][A-Za-z0-9_]*)/,
+  scala: /^(?:(?:private|protected|override|final)\s+)*def\s+([A-Za-z_][A-Za-z0-9_]*)/,
+  php: /^(?:(?:public|private|protected|static|abstract|final)\s+)*function\s+&?([A-Za-z_][A-Za-z0-9_]*)\s*\(/,
+  javascript:
+    /^(?:export\s+)?(?:default\s+)?(?:async\s+)?function\s*\*?\s*([A-Za-z_$][\w$]*)\s*\(|^(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s*)?(?:function\b|\([^)]*\)\s*=>)/,
+  typescript:
+    /^(?:export\s+)?(?:default\s+)?(?:async\s+)?function\s*\*?\s*([A-Za-z_$][\w$]*)\s*[<(]|^(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*(?::[^=]+)?=\s*(?:async\s*)?(?:function\b|(?:<[^>]*>)?\([^)]*\)\s*(?::[^=]+)?=>)/,
+  java: /^(?:(?:public|private|protected|static|final|abstract|synchronized|native)\s+)*(?:<[^>]+>\s*)?[\w<>\[\],.?\s]+\s+([A-Za-z_][A-Za-z0-9_]*)\s*\([^;]*\)\s*(?:throws\s+[\w.,\s]+)?\{?\s*$/,
+  csharp: /^(?:(?:public|private|protected|internal|static|virtual|override|async|sealed|abstract)\s+)*[\w<>\[\],.?\s]+\s+([A-Za-z_][A-Za-z0-9_]*)\s*\([^;]*\)\s*\{?\s*$/,
+  dart: /^(?:static\s+)?(?:[\w<>\[\],.?]+\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*\([^;]*\)\s*(?:async\s*)?\{?\s*$/,
+};
 
 function maxIndentDepth(body: string[]): number {
   let max = 0;
@@ -325,8 +362,168 @@ const RULES: Rule[] = [
     suggestion: "for idx, value in enumerate(items): ...",
   },
   {
+    id: "java-system-exit",
+    languages: ["java", "kotlin", "scala"],
+    test: /System\.exit\s*\(|exitProcess\s*\(/,
+    severity: "minor",
+    category: "architecture",
+    title: "Жёсткое завершение процесса System.exit()",
+    message: "Прерывание JVM из бизнес-логики делает код нетестируемым и обрывает finally-блоки вызывающих.",
+    suggestion: "Бросьте исключение и обработайте его в точке входа.",
+  },
+  {
+    id: "java-catch-throwable",
+    languages: ["java", "kotlin", "scala", "csharp"],
+    test: /catch\s*\(\s*(Throwable|Exception|Error|Object)\b/,
+    severity: "minor",
+    category: "correctness",
+    title: "Перехват слишком общего исключения",
+    message: "catch (Exception/Throwable) скрывает ошибки программирования (NPE, OOM) и усложняет отладку.",
+    suggestion: "Ловите конкретные типы исключений; логируйте и пробрасывайте остальные.",
+  },
+  {
+    id: "java-string-concat-loop",
+    languages: ["java", "kotlin", "csharp"],
+    test: /^\s*\w+\s*\+=\s*"|^\s*\w+\s*=\s*\w+\s*\+\s*"/,
+    severity: "info",
+    category: "complexity",
+    title: "Конкатенация строк через +=",
+    message: "Строки неизменяемы: каждое += создаёт новый объект — O(N^2) в цикле.",
+    suggestion: "Используйте StringBuilder / String.join / buildString.",
+  },
+  {
+    id: "go-ignored-error",
+    languages: ["go"],
+    test: /\b_\s*(?:,\s*\w+\s*)?:?=\s*\w+(\.\w+)*\(|,\s*_\s*:?=\s*\w+(\.\w+)*\(/,
+    severity: "major",
+    category: "correctness",
+    title: "Проигнорирована ошибка (err → _)",
+    message: "В Go ошибки — это значения; замена err на _ скрывает сбои ввода-вывода и парсинга.",
+    suggestion: "Проверяйте err и возвращайте/оборачивайте её: if err != nil { return fmt.Errorf(...) }",
+  },
+  {
+    id: "go-panic",
+    languages: ["go"],
+    test: /\bpanic\s*\(/,
+    severity: "minor",
+    category: "correctness",
+    title: "Использование panic() в обычном потоке",
+    message: "panic предназначен для невосстановимых ситуаций; в библиотечном коде это аварийное завершение всей программы.",
+    suggestion: "Возвращайте error вызывающему коду.",
+  },
+  {
+    id: "rust-unwrap",
+    languages: ["rust"],
+    test: /\.unwrap\(\)|\.expect\(/,
+    severity: "minor",
+    category: "correctness",
+    title: "unwrap()/expect() без обработки ошибки",
+    message: "При None/Err поток завершится panic. В учебной работе допустимо только в тестах и прототипах.",
+    suggestion: "Используйте оператор ? либо match / if let / unwrap_or_else.",
+  },
+  {
+    id: "rust-unsafe",
+    languages: ["rust"],
+    test: /\bunsafe\s*\{/,
+    severity: "major",
+    category: "security",
+    title: "Блок unsafe",
+    message: "Внутри unsafe компилятор не гарантирует безопасность памяти — требуется явное обоснование инварианта.",
+    suggestion: "Добавьте комментарий // SAFETY: ... или найдите безопасную абстракцию.",
+  },
+  {
+    id: "js-var",
+    languages: ["javascript", "typescript"],
+    test: /^\s*var\s+\w+/,
+    severity: "info",
+    category: "style",
+    title: "Объявление через var",
+    message: "var имеет функциональную область видимости и hoisting, что приводит к трудноуловимым ошибкам.",
+    suggestion: "Используйте const (по умолчанию) или let.",
+  },
+  {
+    id: "js-loose-equality",
+    languages: ["javascript", "typescript", "php"],
+    test: /[^=!]==[^=]|!=[^=]/,
+    severity: "minor",
+    category: "correctness",
+    title: "Нестрогое сравнение ==",
+    message: "Нестрогое равенство выполняет неявное приведение типов ('0' == false → true).",
+    suggestion: "Используйте === и !==.",
+  },
+  {
+    id: "js-eval",
+    languages: ["javascript", "typescript", "php", "ruby", "perl"],
+    test: /\beval\s*\(|new\s+Function\s*\(/,
+    severity: "critical",
+    category: "security",
+    title: "Динамическое выполнение кода (eval)",
+    message: "eval выполняет произвольный код — вектор инъекции и блокировка оптимизаций движка.",
+    suggestion: "Используйте JSON.parse, таблицу функций или явный парсер.",
+  },
+  {
+    id: "ts-any",
+    languages: ["typescript"],
+    test: /:\s*any\b|<any>|as\s+any\b/,
+    severity: "minor",
+    category: "correctness",
+    title: "Тип any отключает проверку типов",
+    message: "any «пробивает» систему типов: ошибки, которые мог поймать компилятор, уходят в runtime.",
+    suggestion: "Используйте unknown с сужением типа либо опишите точный интерфейс.",
+  },
+  {
+    id: "js-console-log",
+    languages: ["javascript", "typescript"],
+    test: /console\.log\s*\(/,
+    severity: "info",
+    category: "style",
+    title: "Отладочный вывод console.log",
+    message: "Отладочные вызовы в сдаваемом коде — признак незавершённой работы.",
+    suggestion: "Удалите или замените на настраиваемый логгер.",
+  },
+  {
+    id: "php-sql-interp",
+    languages: ["php"],
+    test: /(SELECT|INSERT|UPDATE|DELETE)\b[^;]*\$\w+|mysql_query\s*\(/i,
+    severity: "critical",
+    category: "security",
+    title: "Возможная SQL-инъекция",
+    message: "Переменная подставляется в SQL напрямую — классическая уязвимость.",
+    suggestion: "Используйте PDO с подготовленными выражениями и bindParam.",
+  },
+  {
+    id: "cs-empty-catch",
+    languages: ["csharp", "java", "kotlin", "javascript", "typescript"],
+    test: /catch\s*(\([^)]*\))?\s*\{\s*\}/,
+    severity: "major",
+    category: "correctness",
+    title: "Пустой блок catch",
+    message: "Проглоченное исключение оставляет программу в неопределённом состоянии без следов в логах.",
+    suggestion: "Как минимум залогируйте исключение; лучше — обработайте или пробросьте.",
+  },
+  {
+    id: "shell-unquoted-var",
+    languages: ["shell"],
+    test: /\b(rm|cp|mv|cat|cd)\s+[^"'\n]*\$\{?\w+\}?(\s|$)/,
+    severity: "major",
+    category: "correctness",
+    title: "Переменная без кавычек в команде",
+    message: "Пробелы и glob-символы в значении приведут к разбиению аргументов (word splitting).",
+    suggestion: 'Заключайте переменные в двойные кавычки: "$var".',
+  },
+  {
+    id: "sql-select-star",
+    languages: ["sql"],
+    test: /\bSELECT\s+\*\s+FROM\b/i,
+    severity: "info",
+    category: "readability",
+    title: "SELECT * вместо явного списка полей",
+    message: "Выборка всех столбцов ломается при изменении схемы и передаёт лишние данные.",
+    suggestion: "Перечислите нужные столбцы явно.",
+  },
+  {
     id: "common-magic-number",
-    languages: ["c", "cpp", "python"],
+    languages: ["c", "cpp", "python", "java", "kotlin", "csharp", "go", "rust", "javascript", "typescript", "php", "swift", "scala", "dart", "ruby"],
     test: /[^\w."'](\d{3,})[^\w."']/,
     severity: "info",
     category: "readability",
@@ -336,7 +533,7 @@ const RULES: Rule[] = [
   },
   {
     id: "common-todo",
-    languages: ["c", "cpp", "python"],
+    languages: ["c", "cpp", "python", "java", "kotlin", "csharp", "go", "rust", "javascript", "typescript", "php", "swift", "scala", "dart", "ruby", "shell", "sql", "lua", "pascal", "r", "perl", "haskell", "matlab", "fortran"],
     test: /\b(TODO|FIXME|HACK)\b/,
     severity: "info",
     category: "style",
@@ -363,9 +560,14 @@ function estimateComplexity(files: SourceFile[]): SandboxReport["complexity"] {
     lines.forEach((raw, idx) => {
       const code = stripInlineComment(raw);
       const indent = (raw.match(/^\s*/)?.[0].replace(/\t/g, "    ").length ?? 0) / 4;
-      const depthMetric = file.language === "python" ? indent : braceDepth;
+      const depthMetric = INDENT_BLOCKS.has(file.language) ? indent : braceDepth;
 
-      if (/\b(for|while)\s*[\(:]/.test(code)) {
+      if (
+        /\b(for|while|foreach|loop)\s*[\(:{]/.test(code) ||
+        /\b(for|while|loop)\b[^;]*\{\s*$/.test(code) ||
+        /\.(forEach|map|filter|reduce)\s*\(/.test(code) ||
+        /\bfor\s+\w+\s+in\b/.test(code)
+      ) {
         while (loopStack.length && loopStack[loopStack.length - 1].depth >= depthMetric) {
           loopStack.pop();
         }
@@ -549,8 +751,10 @@ export function runStaticAnalysis(files: SourceFile[]): SandboxReport {
       } else {
         log.push(`[gcc] ${file.path}: компиляция успешна (-Wall -Wextra -O2)`);
       }
-    } else {
+    } else if (file.language === "python") {
       log.push(`[ruff] ${file.path}: проверено`);
+    } else {
+      log.push(`[lint:${file.language}] ${file.path}: проверено`);
     }
 
     const fns = extractFunctions(file);
@@ -636,8 +840,8 @@ export function runStaticAnalysis(files: SourceFile[]): SandboxReport {
   log.push("[sandbox] контейнер остановлен и удалён (exit code 0)");
 
   return {
-    engine: "syntaxray-static-engine/1.4",
-    toolchain: ["gcc -Wall -Wextra", "clang-tidy", "cppcheck", "valgrind --leak-check=full", "ruff", "radon"],
+    engine: "syntaxray-static-engine/1.5",
+    toolchain: toolchainFor(files),
     metrics: {
       files: files.length,
       totalLines,
@@ -658,6 +862,24 @@ export function runStaticAnalysis(files: SourceFile[]): SandboxReport {
     findings: dedupe(findings).slice(0, 120),
     log,
   };
+}
+
+function toolchainFor(files: SourceFile[]): string[] {
+  const langs = new Set(files.map((f) => f.language));
+  const out: string[] = [];
+  if (langs.has("c") || langs.has("cpp")) out.push("gcc -Wall -Wextra", "clang-tidy", "cppcheck", "valgrind --leak-check=full");
+  if (langs.has("python")) out.push("ruff", "radon");
+  if (langs.has("java") || langs.has("kotlin")) out.push("javac -Xlint", "checkstyle", "detekt");
+  if (langs.has("go")) out.push("go vet", "staticcheck");
+  if (langs.has("rust")) out.push("cargo clippy");
+  if (langs.has("javascript") || langs.has("typescript")) out.push("tsc --noEmit", "eslint");
+  if (langs.has("csharp")) out.push("dotnet build /warnaserror");
+  if (langs.has("php")) out.push("phpstan");
+  if (langs.has("ruby")) out.push("rubocop");
+  if (langs.has("shell")) out.push("shellcheck");
+  if (langs.has("sql")) out.push("sqlfluff");
+  if (out.length === 0) out.push("generic-lint");
+  return out;
 }
 
 function dedupe(findings: AnalysisFinding[]): AnalysisFinding[] {

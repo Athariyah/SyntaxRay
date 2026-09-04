@@ -5,6 +5,7 @@
  * На Vercel: Project → Settings → Environment Variables → GEMINI_API_KEY.
  * Никогда не обращайтесь к этому модулю из клиентских компонентов.
  */
+import { parseAIGenerated } from "@/lib/ai/providers/common";
 import { SYNTAXRAY_SYSTEM_PROMPT } from "@/lib/ai/system-prompt";
 import type { DirectAIConfig } from "@/lib/ai/direct-config";
 import type { AnalysisFinding, SandboxReport, SourceFile } from "@/lib/types";
@@ -28,6 +29,7 @@ export interface GeminiReview {
   actionItems: string[];
   sections: Array<{ title: string; body: string }>;
   findings: AnalysisFinding[];
+  aiGenerated?: { probability: number; reasoning: string } | null;
 }
 
 export function isGeminiConfigured(config?: DirectAIConfig): boolean {
@@ -198,6 +200,7 @@ function normalize(raw: unknown, files: SourceFile[]): GeminiReview {
     actionItems: toStringArray(data.actionItems),
     sections,
     findings,
+    aiGenerated: parseAIGenerated(data.aiGenerated),
   };
 }
 
