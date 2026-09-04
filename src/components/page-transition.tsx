@@ -1,28 +1,26 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { AnimatePresence, motion } from "framer-motion";
 import type { ReactNode } from "react";
 
 /**
- * Плавный переход между страницами.
- * Анимация намеренно сдержанная (18px / 320ms / easeOut),
- * чтобы не мешать длительной работе с кодом.
+ * Переход между страницами БЕЗ блокировки навигации.
+ *
+ * Раньше здесь был `AnimatePresence mode="wait"`: новая страница не
+ * монтировалась, пока не отыграет exit-анимация старой (~320 мс).
+ * На тяжёлых страницах (Monaco, дашборд) exit-кадр проседал, вкладки
+ * переключались с лагом, а при быстрых кликах навигация «залипала»
+ * и казалось, что вкладка не подгрузилась.
+ *
+ * Теперь: новая страница монтируется мгновенно, лёгкая CSS-анимация
+ * появления (`page-in`) не блокирует интерактив и уважает
+ * prefers-reduced-motion.
  */
 export function PageTransition({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   return (
-    <AnimatePresence mode="wait" initial={false}>
-      <motion.main
-        key={pathname}
-        initial={{ opacity: 0, y: 14 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -8 }}
-        transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
-        className="flex-1"
-      >
-        {children}
-      </motion.main>
-    </AnimatePresence>
+    <main key={pathname} className="animate-page-in flex-1">
+      {children}
+    </main>
   );
 }

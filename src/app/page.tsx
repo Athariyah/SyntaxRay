@@ -3,6 +3,8 @@ import { count } from "drizzle-orm";
 import { getDb } from "@/db";
 import { findings, submissions } from "@/db/schema";
 import { Reveal } from "@/components/reveal";
+import { LiveDemo } from "@/components/live-demo";
+import { RoiCalculator } from "@/components/roi-calculator";
 import { isGeminiConfigured } from "@/lib/ai/gemini";
 
 export const dynamic = "force-dynamic";
@@ -119,6 +121,59 @@ export default async function LandingPage() {
         </Reveal>
       </section>
 
+      {/* ЖИВОЕ ДЕМО */}
+      <section className="mt-20">
+        <Reveal>
+          <LiveDemo />
+        </Reveal>
+      </section>
+
+      {/* ДЛЯ КОГО */}
+      <section className="mt-28">
+        <Reveal>
+          <h2 className="text-2xl font-semibold tracking-tight">Кому это экономит время</h2>
+          <p className="mt-2 text-slate-400">Один движок — три рынка с одной и той же болью.</p>
+        </Reveal>
+        <div className="mt-8 grid gap-4 md:grid-cols-3">
+          {[
+            {
+              icon: "🎓",
+              title: "Вузы и колледжи",
+              text: "120 студентов × 4 работы = 480 ревью за семестр. Платформа снимает рутину, преподаватель разбирает только сложные случаи.",
+              points: ["Антиплагиат-фильтр пар", "CSV-ведомость в один клик", "Динамика группы по дням"],
+            },
+            {
+              icon: "🚀",
+              title: "Хакатоны и школы",
+              text: "Сотни участников, десятки менторов. Мгновенный фидбэк держит мотивацию, а организаторы видят честную таблицу качества.",
+              points: ["Ревью за 10–40 секунд", "Чек-лист «к пересдаче»", "Публичная ссылка на отчёт"],
+            },
+            {
+              icon: "🏢",
+              title: "Корпоративные академии",
+              text: "Онбординг джунов и грейды без отрыва сеньоров от продакшена. Единая шкала 0–100 делает оценку найма воспроизводимой.",
+              points: ["Шесть осей проверки", "Экспорт JSON для HR-систем", "Изолированная песочница"],
+            },
+          ].map((a, i) => (
+            <Reveal key={a.title} delay={0.06 * i}>
+              <article className="glass flex h-full flex-col rounded-2xl p-6">
+                <div className="text-2xl">{a.icon}</div>
+                <h3 className="mt-4 text-base font-semibold text-slate-100">{a.title}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-slate-400">{a.text}</p>
+                <ul className="mt-4 space-y-1.5 border-t border-white/5 pt-4 text-xs text-slate-400">
+                  {a.points.map((p) => (
+                    <li key={p} className="flex gap-2">
+                      <span className="text-emerald-400">✓</span>
+                      {p}
+                    </li>
+                  ))}
+                </ul>
+              </article>
+            </Reveal>
+          ))}
+        </div>
+      </section>
+
       {/* ВОЗМОЖНОСТИ */}
       <section className="mt-28">
         <Reveal>
@@ -152,6 +207,84 @@ export default async function LandingPage() {
                 <p className="mt-2 text-sm text-slate-400">{item.text}</p>
                 <div className="pointer-events-none absolute -right-10 -top-10 h-24 w-24 rounded-full bg-ray-400/10 blur-2xl" />
               </div>
+            </Reveal>
+          ))}
+        </div>
+      </section>
+
+      {/* ROI */}
+      <section className="mt-28">
+        <Reveal>
+          <RoiCalculator />
+        </Reveal>
+      </section>
+
+      {/* ТАРИФЫ */}
+      <section className="mt-28">
+        <Reveal>
+          <h2 className="text-2xl font-semibold tracking-tight">Тарифы</h2>
+          <p className="mt-2 text-slate-400">Старт — бесплатно. Масштаб — по подписке.</p>
+        </Reveal>
+        <div className="mt-8 grid gap-4 md:grid-cols-3">
+          {[
+            {
+              name: "Старт",
+              price: "0 ₽",
+              desc: "Для одного преподавателя",
+              points: ["30 ревью в месяц", "Детерминированный движок", "Дашборд и CSV-ведомость"],
+              cta: "Начать бесплатно",
+              hot: false,
+            },
+            {
+              name: "Кафедра",
+              price: "9 900 ₽/мес",
+              desc: "Для потока и методкомиссии",
+              points: ["Безлимитные ревью", "Gemini-ревью + антиплагиат", "Аналитика группы и тренды", "Приоритетная поддержка"],
+              cta: "Выбрать «Кафедру»",
+              hot: true,
+            },
+            {
+              name: "Кампус",
+              price: "по запросу",
+              desc: "Для вуза и EdTech-платформ",
+              points: ["SSO и роли проверяющих", "On-premise песочница", "API и white-label", "SLA 99,9%"],
+              cta: "Связаться с нами",
+              hot: false,
+            },
+          ].map((t, i) => (
+            <Reveal key={t.name} delay={0.06 * i}>
+              <article
+                className={`flex h-full flex-col rounded-2xl p-6 ${
+                  t.hot ? "glass-strong border border-ray-400/30" : "glass"
+                }`}
+              >
+                {t.hot && (
+                  <span className="mb-3 w-fit rounded-full bg-gradient-to-r from-ray-400 to-violet-ray px-3 py-1 text-[11px] font-semibold text-ink-950">
+                    ВЫБИРАЮТ ЧАЩЕ
+                  </span>
+                )}
+                <h3 className="text-base font-semibold text-slate-100">{t.name}</h3>
+                <p className="mt-1 font-mono text-2xl text-ray-300">{t.price}</p>
+                <p className="mt-1 text-xs text-slate-500">{t.desc}</p>
+                <ul className="mt-4 flex-1 space-y-1.5 text-xs text-slate-400">
+                  {t.points.map((p) => (
+                    <li key={p} className="flex gap-2">
+                      <span className="text-ray-400">▸</span>
+                      {p}
+                    </li>
+                  ))}
+                </ul>
+                <Link
+                  href="/new"
+                  className={`mt-6 rounded-xl px-5 py-2.5 text-center text-sm font-semibold transition-transform hover:scale-[1.02] ${
+                    t.hot
+                      ? "bg-gradient-to-r from-ray-400 to-violet-ray text-ink-950"
+                      : "border border-white/10 text-slate-200 hover:border-ray-400/30"
+                  }`}
+                >
+                  {t.cta}
+                </Link>
+              </article>
             </Reveal>
           ))}
         </div>

@@ -2,7 +2,6 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AnimatePresence, motion } from "framer-motion";
 import JSZip from "jszip";
 import { AnalysisProgress } from "@/components/analysis-progress";
 import { isAnalyzableFile } from "@/lib/languages";
@@ -110,10 +109,14 @@ export function SubmitForm() {
         body: JSON.stringify(payload),
       });
       const data = (await response.json()) as { publicId?: string; error?: string };
-      if (!response.ok || !data.publicId) {
-        throw new Error(data.error ?? "Не удалось выполнить анализ");
+      // Заявка создана, даже если анализ упал (500 + publicId): ведём на
+      // страницу ревью, где показан статус failed, а не «ошибка/404».
+      if (data.publicId) {
+        router.push(`/review/${data.publicId}`);
+        router.refresh();
+        return;
       }
-      router.push(`/review/${data.publicId}`);
+      throw new Error(data.error ?? "Не удалось выполнить анализ");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Непредвиденная ошибка");
       setBusy(false);
@@ -134,19 +137,16 @@ export function SubmitForm() {
           {TABS.map((tab) => (
             <button
               key={tab.id}
+              role="tab"
+              aria-selected={mode === tab.id}
               onClick={() => setMode(tab.id)}
-              className={`relative flex-1 rounded-lg px-4 py-2.5 text-sm transition-colors ${
-                mode === tab.id ? "text-ink-950" : "text-slate-400 hover:text-slate-200"
+              className={`flex-1 rounded-lg px-4 py-2.5 text-sm transition-colors ${
+                mode === tab.id
+                  ? "bg-gradient-to-r from-ray-300 to-ray-400 text-ink-950"
+                  : "text-slate-400 hover:text-slate-200"
               }`}
             >
-              {mode === tab.id && (
-                <motion.span
-                  layoutId="mode-pill"
-                  className="absolute inset-0 rounded-lg bg-gradient-to-r from-ray-300 to-ray-400"
-                  transition={{ type: "spring", stiffness: 380, damping: 32 }}
-                />
-              )}
-              <span className="relative font-medium">{tab.label}</span>
+              <span className="font-medium">{tab.label}</span>
             </button>
           ))}
         </div>
@@ -159,16 +159,10 @@ export function SubmitForm() {
           <Field label="Группа / трек" value={cohort} onChange={setCohort} placeholder="БПИ-231" />
         </div>
 
-        {/* Источник */}
+        {/* Источник: мгновенное переключение без AnimatePresence mode="wait"
+            (он ждал exit-анимацию и табы «залипали») */}
         <div className="mt-6">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={mode}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.25 }}
-            >
+          <div key={mode} className="animate-page-in">
               {mode === "paste" && (
                 <div>
                   <div className="mb-2 flex items-center justify-between">
@@ -253,18 +247,16 @@ export function SubmitForm() {
                   </p>
                 </div>
               )}
-            </motion.div>
-          </AnimatePresence>
+            </div>
         </div>
 
         {error && (
-          <motion.p
-            initial={{ opacity: 0, y: -6 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mt-4 rounded-lg border border-rose-400/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200"
+          <p
+            role="alert"
+            className="animate-page-in mt-4 rounded-lg border border-rose-400/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200"
           >
             {error}
-          </motion.p>
+          </p>
         )}
 
         <button
@@ -277,19 +269,12 @@ export function SubmitForm() {
       </div>
 
       <div className="space-y-4">
-        <AnimatePresence mode="wait">
-          {busy ? (
-            <motion.div key="progress" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              <AnalysisProgress />
-            </motion.div>
-          ) : (
-            <motion.div
-              key="info"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="glass rounded-2xl p-6"
-            >
+        {busy ? (
+          <div key="progress" className="animate-page-in">
+            <AnalysisProgress />
+          </div>
+        ) : (
+          <div key="info" className="glass animate-page-in rounded-2xl p-6">
               <h3 className="text-sm font-semibold text-slate-100">Что произойдёт дальше</h3>
               <ol className="mt-4 space-y-3 text-sm text-slate-400">
                 {[
@@ -312,9 +297,8 @@ export function SubmitForm() {
                   <li>• поддерживаются C, C++ (17/20) и Python 3</li>
                 </ul>
               </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+          </div>
+        )}
       </div>
     </div>
   );
