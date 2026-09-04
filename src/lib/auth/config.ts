@@ -47,7 +47,7 @@ const providers: Record<ProviderName, OAuthProvider> = {
     name: "max",
     label: "MAX",
     color: "#00E676",
-    icon: "MAX",
+    icon: "M",
     authorizeUrl: process.env.MAX_AUTHORIZE_URL ?? "https://oauth.max.ru/authorize",
     tokenUrl: process.env.MAX_TOKEN_URL ?? "https://oauth.max.ru/token",
     userInfoUrl: process.env.MAX_USERINFO_URL ?? "https://oauth.max.ru/userinfo",

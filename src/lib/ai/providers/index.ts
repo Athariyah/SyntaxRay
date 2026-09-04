@@ -12,6 +12,7 @@ import { isGeminiConfigured, requestGeminiReview, getGeminiModelName } from "@/l
 import { isGigachatConfigured, requestGigachatReview, getGigachatModelName } from "./gigachat";
 import { isYandexGPTConfigured, requestYandexGPTReview, getYandexGPTModelName } from "./yandexgpt";
 import type { AIReview } from "./common";
+import type { DirectAIConfig } from "@/lib/ai/direct-config";
 import type { SandboxReport, SourceFile } from "@/lib/types";
 
 export type AIProviderName = "gigachat" | "yandexgpt" | "gemini" | "heuristic";
@@ -83,9 +84,13 @@ export async function requestAIReview(params: {
   language: string;
   files: SourceFile[];
   sandbox: SandboxReport;
+  aiConfig?: DirectAIConfig;
 }): Promise<{ review: AIReview; provider: AIProviderName; model: string } | null> {
-  const preferred = getPreferred();
-  const fallback = shouldFallback();
+  const direct = params.aiConfig;
+  const preferred = direct?.provider && direct.provider !== "auto" ? direct.provider : getPreferred();
+  const fallback = direct?.provider && direct.provider !== "auto" ? false : shouldFallback();
+
+  if (preferred === "heuristic") return null;
 
   const tryOrder: AIProviderName[] =
     preferred === "auto"
@@ -97,22 +102,19 @@ export async function requestAIReview(params: {
       let review: AIReview | null = null;
       let model = "";
       if (provider === "gigachat") {
-        if (!isGigachatConfigured()) continue;
-        review = await requestGigachatReview(params);
-        model = getGigachatModelName();
+        if (!isGigachatConfigured(direct)) continue;
+        review = await requestGigachatReview({ ...params, aiConfig: direct });
+        model = getGigachatModelName(direct);
       } else if (provider === "yandexgpt") {
-        if (!isYandexGPTConfigured()) continue;
-        review = await requestYandexGPTReview(params);
-        model = getYandexGPTModelName();
+        if (!isYandexGPTConfigured(direct)) continue;
+        review = await requestYandexGPTReview({ ...params, aiConfig: direct });
+        model = getYandexGPTModelName(direct);
       } else if (provider === "gemini") {
-        if (!isGeminiConfigured()) continue;
-        review = await requestGeminiReview(params);
-        model = getGeminiModelName();
+        if (!isGeminiConfigured(direct)) continue;
+        review = await requestGeminiReview({ ...params, aiConfig: direct });
+        model = getGeminiModelName(direct);
       }
-      if (review) {
-        // Пометим findings origin как gemini для совместимости, но можно расширить
-        return { review, provider, model };
-      }
+      if (review) return { review, provider, model };
       // Провайдер настроен, но вернул null (ошибка сети/квота) — пробуем фолбэк если разрешён
       if (!fallback) return null;
     } catch (e) {

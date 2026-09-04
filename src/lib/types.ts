@@ -27,7 +27,7 @@ export interface AnalysisFinding {
   title: string;
   message: string;
   suggestion?: string | null;
-  origin: "heuristic" | "gemini" | "sandbox";
+    origin: "heuristic" | "gemini" | "gigachat" | "yandexgpt" | "sandbox";
 }
 
 /** Результат работы песочницы (Docker) — детерминированные метрики. */

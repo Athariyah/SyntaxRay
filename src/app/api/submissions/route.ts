@@ -11,6 +11,7 @@ import { aggregateLanguage, detectLanguage } from "@/lib/languages";
 import { fetchRepoFiles } from "@/lib/repo";
 import type { SourceFile } from "@/lib/types";
 import { SESSION_COOKIE, verifySession } from "@/lib/auth/jwt";
+import { directConfigHasCredentials, parseDirectAIConfig } from "@/lib/ai/direct-config";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -80,6 +81,7 @@ export async function POST(request: Request) {
     sourceKind?: string;
     repoUrl?: string;
     files?: Array<{ path?: string; content?: string }>;
+    aiConfig?: unknown;
   };
 
   try {
@@ -89,6 +91,18 @@ export async function POST(request: Request) {
   }
 
   const sourceKind = body.sourceKind === "repo" || body.sourceKind === "archive" ? body.sourceKind : "paste";
+  const aiConfig = parseDirectAIConfig(body.aiConfig);
+  if (!directConfigHasCredentials(aiConfig)) {
+    return NextResponse.json(
+      {
+        error:
+          aiConfig?.provider === "yandexgpt"
+            ? "Для YandexGPT укажите API-ключ и Folder ID (или полный modelUri gpt://...)."
+            : "Для выбранной модели укажите API-ключ.",
+      },
+      { status: 400 },
+    );
+  }
   let files: SourceFile[] = [];
 
   try {
@@ -181,7 +195,7 @@ export async function POST(request: Request) {
   );
 
   try {
-    const report = await analyzeSubmission({ title, language, files });
+    const report = await analyzeSubmission({ title, language, files, aiConfig });
 
     if (report.sandbox.findings.length > 0) {
       await db.insert(findingsTable).values(

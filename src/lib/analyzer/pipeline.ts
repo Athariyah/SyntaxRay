@@ -8,6 +8,7 @@
  *  3. Слияние находок, расчёт итоговых баллов и формирование отчёта.
  */
 import { requestAIReview, getActiveModelName } from "@/lib/ai/providers";
+import type { DirectAIConfig } from "@/lib/ai/direct-config";
 import { runStaticAnalysis } from "@/lib/analyzer/static-engine";
 import type { AnalysisFinding, ReviewReport, SandboxReport, SourceFile } from "@/lib/types";
 
@@ -143,6 +144,7 @@ export async function analyzeSubmission(params: {
   title: string;
   language: string;
   files: SourceFile[];
+  aiConfig?: DirectAIConfig;
 }): Promise<ReviewReport> {
   const sandbox = await runSandbox(params.files);
   const aiResult = await requestAIReview({
@@ -150,6 +152,7 @@ export async function analyzeSubmission(params: {
     language: params.language,
     files: params.files,
     sandbox,
+    aiConfig: params.aiConfig,
   });
 
   if (!aiResult) {

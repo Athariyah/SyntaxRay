@@ -130,7 +130,9 @@ export default function DocsPage() {
           <h2 className="text-lg font-semibold">Архитектура</h2>
           <p className="mt-2 text-sm leading-relaxed text-slate-400">
             Фронтенд на Next.js (App Router) публикуется на Vercel и хранит заявки в PostgreSQL через Drizzle ORM.
-            Пайплайн ревью состоит из двух ступеней: детерминированной (песочница) и семантической (Gemini).
+            Пайплайн ревью состоит из двух ступеней: детерминированной (песочница) и семантической
+            (GigaChat / YandexGPT / Gemini). На странице «Новое ревью» можно выбрать модель и ввести разовый ключ
+            без переменных окружения; ключ используется только в памяти запроса.
             Если <code className="font-mono text-ray-300">SANDBOX_API_URL</code> не задан, используется встроенный
             TypeScript-движок с тем же JSON-контрактом — платформа работает сразу после деплоя.
           </p>
@@ -164,8 +166,8 @@ export default function DocsPage() {
             </table>
           </div>
           <p className="mt-4 text-xs text-slate-500">
-            Ключ Gemini читается только на сервере (<code className="font-mono">process.env.GEMINI_API_KEY</code>)
-            и никогда не попадает в клиентский бандл: запросы к модели идут из route handler.
+            Ключи ИИ читаются только на сервере или передаются разово в route handler при запуске ревью.
+            Они не сохраняются в БД, не попадают в клиентский бандл и не выводятся в отчёте.
           </p>
         </section>
       </Reveal>

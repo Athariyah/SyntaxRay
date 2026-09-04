@@ -40,6 +40,14 @@ const SEVERITY_TO_MONACO: Record<Severity, number> = {
 /** Больше маркеров за раз Monaco отрисовывает с просадкой — остальное видно в панели. */
 const MAX_RENDERED_MARKERS = 250;
 
+function originLabel(origin: string): string {
+  if (origin === "gigachat") return "GigaChat";
+  if (origin === "yandexgpt") return "YandexGPT";
+  if (origin === "gemini") return "Gemini";
+  if (origin === "sandbox") return "Sandbox";
+  return "Static";
+}
+
 export function CodeViewer({
   path,
   language,
@@ -81,7 +89,7 @@ export function CodeViewer({
           endColumn: model.getLineMaxColumn(endLine),
           severity: SEVERITY_TO_MONACO[m.severity],
           message: `${m.title}\n\n${m.message}${m.suggestion ? `\n\nКак исправить: ${m.suggestion}` : ""}`,
-          source: m.origin === "gemini" ? "СинтексПруф · Gemini" : "СинтексПруф · Static",
+          source: `СинтексПруф · ${originLabel(m.origin)}`,
         };
       }),
     );

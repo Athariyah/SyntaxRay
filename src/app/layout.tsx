@@ -8,6 +8,11 @@ export const metadata: Metadata = {
   title: "СинтексПруф — автоматизированное академическое ревью кода",
   description:
     "СинтексПруф — платформа статического анализа и ИИ-ревью кода на C, C++ и Python с поддержкой российских нейросетей (YandexGPT, Gigachat, GigaChat). Вход через Яндекс, VK, MAX, Госуслуги.",
+  icons: {
+    icon: "/icon.svg",
+    shortcut: "/icon.svg",
+    apple: "/icon.svg",
+  },
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

@@ -12,9 +12,10 @@
 
 import { SINTEKSPROOF_SYSTEM_PROMPT } from "./common";
 import { buildUserPrompt, normalizeAIResponse, parseJsonBlock, type AIReview } from "./common";
+import type { DirectAIConfig } from "@/lib/ai/direct-config";
 import type { SandboxReport, SourceFile } from "@/lib/types";
 
-let cachedToken: { token: string; expiresAt: number } | null = null;
+const cachedTokens = new Map<string, { token: string; expiresAt: number }>();
 
 function getAuthUrl(): string {
   return process.env.GIGACHAT_AUTH_URL ?? "https://ngw.devices.sberbank.ru:9443/api/v2/oauth";
@@ -22,38 +23,47 @@ function getAuthUrl(): string {
 function getBaseUrl(): string {
   return (process.env.GIGACHAT_BASE_URL ?? "https://gigachat.devices.sberbank.ru/api/v1").replace(/\/$/, "");
 }
-function getModel(): string {
-  return process.env.GIGACHAT_MODEL ?? "GigaChat";
+function getModel(config?: DirectAIConfig): string {
+  return config?.model?.trim() || process.env.GIGACHAT_MODEL || "GigaChat";
 }
 function getScope(): string {
   return process.env.GIGACHAT_SCOPE ?? "GIGACHAT_API_PERS";
 }
 
-export function isGigachatConfigured(): boolean {
-  // Поддерживает два варианта: GIGACHAT_AUTH_KEY (base64 client:secret) или пара ID/SECRET
+export function isGigachatConfigured(config?: DirectAIConfig): boolean {
+  // Разовый ключ: base64 Authorization key из кабинета GigaChat или пара client_id:client_secret.
+  if (config?.apiKey && config.apiKey.length > 10) return true;
   return Boolean(
     (process.env.GIGACHAT_AUTH_KEY && process.env.GIGACHAT_AUTH_KEY.length > 10) ||
       (process.env.GIGACHAT_CLIENT_ID && process.env.GIGACHAT_CLIENT_SECRET),
   );
 }
 
-async function getAccessToken(): Promise<string | null> {
-  if (cachedToken && Date.now() < cachedToken.expiresAt - 60_000) {
-    return cachedToken.token;
+function buildAuthHeader(config?: DirectAIConfig): string | null {
+  const directKey = config?.apiKey?.trim();
+  if (directKey) {
+    if (/^Basic\s+/i.test(directKey)) return directKey;
+    if (directKey.includes(":")) return `Basic ${Buffer.from(directKey).toString("base64")}`;
+    return `Basic ${directKey}`;
   }
 
   const clientId = process.env.GIGACHAT_CLIENT_ID;
   const clientSecret = process.env.GIGACHAT_CLIENT_SECRET;
   const authKey = process.env.GIGACHAT_AUTH_KEY;
-  const scope = getScope();
+  if (authKey) return `Basic ${authKey}`;
+  if (clientId && clientSecret) return `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString("base64")}`;
+  return null;
+}
 
-  let authHeader: string;
-  if (authKey) {
-    authHeader = `Basic ${authKey}`;
-  } else if (clientId && clientSecret) {
-    authHeader = `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString("base64")}`;
-  } else {
-    return null;
+async function getAccessToken(config?: DirectAIConfig): Promise<string | null> {
+  const scope = getScope();
+  const authHeader = buildAuthHeader(config);
+  if (!authHeader) return null;
+
+  const cacheKey = `${authHeader}:${scope}`;
+  const cachedToken = cachedTokens.get(cacheKey);
+  if (cachedToken && Date.now() < cachedToken.expiresAt - 60_000) {
+    return cachedToken.token;
   }
 
   const rqUid = crypto.randomUUID();
@@ -82,7 +92,7 @@ async function getAccessToken(): Promise<string | null> {
     const expiresIn = data.expires_at
       ? data.expires_at - Date.now()
       : (data.expires_in ?? 1800) * 1000;
-    cachedToken = { token, expiresAt: Date.now() + expiresIn };
+    cachedTokens.set(cacheKey, { token, expiresAt: Date.now() + expiresIn });
     return token;
   } catch (e) {
     console.error("[gigachat] oauth failed", e);
@@ -95,15 +105,16 @@ export async function requestGigachatReview(params: {
   language: string;
   files: SourceFile[];
   sandbox: SandboxReport;
+  aiConfig?: DirectAIConfig;
 }): Promise<AIReview | null> {
-  if (!isGigachatConfigured()) return null;
-  const token = await getAccessToken();
+  if (!isGigachatConfigured(params.aiConfig)) return null;
+  const token = await getAccessToken(params.aiConfig);
   if (!token) return null;
 
   const userPrompt = buildUserPrompt(params);
 
   const body = {
-    model: getModel(),
+    model: getModel(params.aiConfig),
     messages: [
       { role: "system", content: SINTEKSPROOF_SYSTEM_PROMPT },
       { role: "user", content: userPrompt },
@@ -116,7 +127,8 @@ export async function requestGigachatReview(params: {
   };
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 90_000);
+  const timeoutMs = params.aiConfig?.provider && params.aiConfig.provider !== "auto" ? 45_000 : 18_000;
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const res = await fetch(`${getBaseUrl()}/chat/completions`, {
       method: "POST",
@@ -139,8 +151,7 @@ export async function requestGigachatReview(params: {
     const text = json.choices?.[0]?.message?.content ?? "";
     if (!text.trim()) return null;
     const normalized = normalizeAIResponse(parseJsonBlock(text), params.files);
-    // Пометим origin как gigachat
-    normalized.findings = normalized.findings.map((f) => ({ ...f, origin: "gemini" as const }));
+    normalized.findings = normalized.findings.map((f) => ({ ...f, origin: "gigachat" as const }));
     return normalized;
   } catch (e) {
     console.error("[gigachat] request failed", e);
@@ -150,6 +161,6 @@ export async function requestGigachatReview(params: {
   }
 }
 
-export function getGigachatModelName(): string {
-  return getModel();
+export function getGigachatModelName(config?: DirectAIConfig): string {
+  return getModel(config);
 }

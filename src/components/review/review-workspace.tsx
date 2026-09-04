@@ -47,6 +47,14 @@ const CATEGORY_LABEL: Record<string, string> = {
 
 type Tab = "findings" | "report" | "sandbox";
 
+function originLabel(origin: string): string {
+  if (origin === "gigachat") return "GigaChat";
+  if (origin === "yandexgpt") return "YandexGPT";
+  if (origin === "gemini") return "Gemini";
+  if (origin === "sandbox") return "Sandbox";
+  return "Static";
+}
+
 export function ReviewWorkspace({
   files,
   findings,
@@ -336,7 +344,7 @@ export function ReviewWorkspace({
                                 {CATEGORY_LABEL[f.category] ?? f.category}
                               </span>
                               <span className="rounded border border-white/10 px-1.5 py-0.5 text-slate-500">
-                                {f.origin === "gemini" ? "Gemini" : f.origin === "sandbox" ? "Sandbox" : "Static"}
+                                {originLabel(f.origin)}
                               </span>
                             </div>
                           </div>
