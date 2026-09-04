@@ -9,7 +9,8 @@ import { findings as findingsTable, reviewFiles, submissions } from "@/db/schema
 import { analyzeSubmission } from "@/lib/analyzer/pipeline";
 import { aggregateLanguage, detectLanguage } from "@/lib/languages";
 import { fetchRepoFiles } from "@/lib/repo";
-import type { SourceFile } from "@/lib/types";
+import type { AnalysisFinding, ReviewReport, SourceFile } from "@/lib/types";
+import type { ReviewContentData } from "@/components/review/review-content";
 import { SESSION_COOKIE, verifySession } from "@/lib/auth/jwt";
 import { directConfigHasCredentials, parseDirectAIConfig } from "@/lib/ai/direct-config";
 
@@ -32,6 +33,70 @@ function dbUnavailable() {
     { error: "База данных недоступна. Задайте DATABASE_URL в переменных окружения Vercel и примените миграции (npx drizzle-kit push)." },
     { status: 503 },
   );
+}
+
+/**
+ * Сериализуемый снапшот ревью для клиента. Он нужен, чтобы на деплое без
+ * DATABASE_URL только что созданное ревью не падало в 404: страница /review
+ * читает эфемерную PGlite ДРУГОГО инстанса функции и не видит строку, поэтому
+ * передаём результат через sessionStorage (см. review-cache.ts).
+ */
+function buildReviewPayload(params: {
+  publicId: string;
+  title: string;
+  author: string;
+  cohort: string;
+  language: string;
+  status: "completed" | "failed";
+  score: number | null;
+  readability: number | null;
+  architecture: number | null;
+  complexity: string | null;
+  verdict: string | null;
+  summary: string | null;
+  engine: string;
+  durationMs: number;
+  files: SourceFile[];
+  findings: AnalysisFinding[];
+  report: ReviewReport | null;
+}): ReviewContentData {
+  return {
+    publicId: params.publicId,
+    title: params.title,
+    author: params.author,
+    cohort: params.cohort,
+    language: params.language,
+    status: params.status,
+    score: params.score,
+    readability: params.readability,
+    architecture: params.architecture,
+    complexity: params.complexity,
+    verdict: params.verdict,
+    summary: params.summary,
+    engine: params.engine,
+    durationMs: params.durationMs,
+    createdAt: new Date().toISOString(),
+    files: params.files.map((f, i) => ({
+      id: i + 1,
+      path: f.path,
+      language: f.language,
+      content: f.content,
+      lineCount: f.content.split("\n").length,
+    })),
+    findings: params.findings.map((f, i) => ({
+      id: i + 1,
+      filePath: f.filePath,
+      line: f.line,
+      endLine: f.endLine ?? null,
+      severity: f.severity,
+      category: f.category,
+      title: f.title,
+      message: f.message,
+      suggestion: f.suggestion ?? null,
+      origin: f.origin,
+    })),
+    report: params.report,
+  };
 }
 
 export async function GET() {
@@ -142,6 +207,8 @@ export async function POST(request: Request) {
 
   const language = aggregateLanguage(files.map((f) => f.language));
   const title = (body.title?.trim() || files[0].path).slice(0, 200);
+  const author = (body.author?.trim() || "Аноним").slice(0, 120);
+  const cohort = (body.cohort?.trim() || "").slice(0, 120);
   const id = publicId();
 
   // Попытка связать заявку с авторизованным пользователем (если есть сессия)
@@ -174,8 +241,8 @@ export async function POST(request: Request) {
     .values({
       publicId: id,
       title,
-      author: (body.author?.trim() || "Аноним").slice(0, 120),
-      cohort: (body.cohort?.trim() || "").slice(0, 120),
+      author,
+      cohort,
       language,
       sourceKind,
       repoUrl: body.repoUrl ?? null,
@@ -231,13 +298,55 @@ export async function POST(request: Request) {
       })
       .where(eq(submissions.id, created.id));
 
-    return NextResponse.json({ publicId: id, score: report.score, verdict: report.verdict });
+    const review = buildReviewPayload({
+      publicId: id,
+      title,
+      author,
+      cohort,
+      language,
+      status: "completed",
+      score: report.score,
+      readability: report.readability,
+      architecture: report.architecture,
+      complexity: report.complexity,
+      verdict: report.verdict,
+      summary: report.summary,
+      engine: report.engine.slice(0, 48),
+      durationMs: Date.now() - startedAt,
+      files,
+      findings: report.sandbox.findings,
+      report,
+    });
+
+    return NextResponse.json({ publicId: id, score: report.score, verdict: report.verdict, review });
   } catch (error) {
     console.error("[submissions] analysis failed:", error);
+    const summary = error instanceof Error ? error.message : "Ошибка анализа";
     await db
       .update(submissions)
-      .set({ status: "failed", summary: error instanceof Error ? error.message : "Ошибка анализа" })
+      .set({ status: "failed", summary })
       .where(eq(submissions.id, created.id));
-    return NextResponse.json({ error: "Анализ завершился с ошибкой", publicId: id }, { status: 500 });
+
+    const review = buildReviewPayload({
+      publicId: id,
+      title,
+      author,
+      cohort,
+      language,
+      status: "failed",
+      score: null,
+      readability: null,
+      architecture: null,
+      complexity: null,
+      verdict: null,
+      summary,
+      engine: "",
+      durationMs: Date.now() - startedAt,
+      files,
+      findings: [],
+      report: null,
+    });
+
+    return NextResponse.json({ error: "Анализ завершился с ошибкой", publicId: id, review }, { status: 500 });
   }
 }

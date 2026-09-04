@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import JSZip from "jszip";
 import { AnalysisProgress } from "@/components/analysis-progress";
 import { isAnalyzableFile } from "@/lib/languages";
+import { saveReview } from "@/lib/review-cache";
+import type { ReviewContentData } from "@/components/review/review-content";
 
 type Mode = "paste" | "archive" | "repo";
 type AIProvider = "auto" | "gigachat" | "yandexgpt" | "gemini" | "heuristic";
@@ -137,15 +139,18 @@ export function SubmitForm() {
         body: JSON.stringify(payload),
       });
       const text = await response.text();
-      let data: { publicId?: string; error?: string } = {};
+      let data: { publicId?: string; error?: string; review?: ReviewContentData } = {};
       try {
-        data = text ? (JSON.parse(text) as { publicId?: string; error?: string }) : {};
+        data = text ? (JSON.parse(text) as typeof data) : {};
       } catch {
         data = { error: text.slice(0, 300) || `HTTP ${response.status}` };
       }
       // Заявка создана, даже если анализ упал (500 + publicId): ведём на
       // страницу ревью, где показан статус failed, а не «ошибка/404».
+      // На деплое без DATABASE_URL серверная БД эфемерна, поэтому результат
+      // кладём в sessionStorage — страница покажет его как фолбэк.
       if (data.publicId) {
+        if (data.review) saveReview(data.review);
         router.push(`/review/${data.publicId}`);
         router.refresh();
         return;
