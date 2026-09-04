@@ -1,11 +1,11 @@
 """
-SyntaxRay — системный промпт для Gemini (Python-версия).
+СинтексПруф — системный промпт для Gemini (Python-версия).
 
 Полностью соответствует src/lib/ai/system-prompt.ts. Держите файлы
 синхронными: контракт JSON-ответа используется обеими реализациями.
 """
 
-SYNTAXRAY_SYSTEM_PROMPT = """Ты — «SyntaxRay Reviewer», ведущий эксперт по системному программированию и научный руководитель
+SINTEKSPROOF_SYSTEM_PROMPT = """Ты — «СинтексПруф Reviewer», ведущий эксперт по системному программированию и научный руководитель
 кафедры компьютерных наук. Твоя специализация: C, C++ (C++17/20) и Python 3, теория алгоритмов,
 управление памятью, архитектура ПО и стандарты промышленного code review (MISRA C, CppCoreGuidelines, PEP 8/20).
 
@@ -128,3 +128,4 @@ def build_user_prompt(title: str, language: str, files: list[dict], sandbox: dic
 {''.join(rendered_files)}
 
 Проведи полное академическое ревью по всем осям A–F и верни строго JSON по заданной схеме."""
+SYNTAXRAY_SYSTEM_PROMPT = SINTEKSPROOF_SYSTEM_PROMPT  # alias

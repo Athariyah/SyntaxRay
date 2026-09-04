@@ -1,9 +1,9 @@
-# SyntaxRay
+# СинтексПруф
 
 **Платформа автоматизированного статического анализа и академического ИИ-ревью кода** для преподавателей
 и организаторов ИТ-мероприятий. Поддерживаются C, C++ и Python 3.
 
-В отличие от систем тестирования LeetCode-типа, SyntaxRay оценивает не «прошли ли тесты», а качество
+В отличие от систем тестирования LeetCode-типа, СинтексПруф оценивает не «прошли ли тесты», а качество
 инженерного решения: утечки памяти, работу с указателями, фактическую асимптотическую сложность,
 архитектурную декомпозицию и читаемость.
 
@@ -88,7 +88,7 @@ npm run dev
 Бэкенд и песочница:
 
 ```bash
-docker build -t syntaxray/sandbox:latest -f backend/sandbox.Dockerfile backend
+docker build -t sinteksproof/sandbox:latest -f backend/sandbox.Dockerfile backend
 docker compose up --build
 curl http://localhost:8000/health     # {"status":"ok","docker":true,"gemini":true}
 ```

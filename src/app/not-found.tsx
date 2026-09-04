@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 export const metadata = {
-  title: "Страница не найдена — SyntaxRay",
+  title: "Страница не найдена — СинтексПруф",
   robots: { index: false, follow: false },
 };
 

@@ -10,6 +10,7 @@ import { analyzeSubmission } from "@/lib/analyzer/pipeline";
 import { aggregateLanguage, detectLanguage } from "@/lib/languages";
 import { fetchRepoFiles } from "@/lib/repo";
 import type { SourceFile } from "@/lib/types";
+import { SESSION_COOKIE, verifySession } from "@/lib/auth/jwt";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -128,6 +129,24 @@ export async function POST(request: Request) {
   const language = aggregateLanguage(files.map((f) => f.language));
   const title = (body.title?.trim() || files[0].path).slice(0, 200);
   const id = publicId();
+
+  // Попытка связать заявку с авторизованным пользователем (если есть сессия)
+  let userId: number | null = null;
+  try {
+    const cookieHeader = request.headers.get("cookie") ?? "";
+    const token = cookieHeader
+      .split(";")
+      .map((c) => c.trim())
+      .find((c) => c.startsWith(`${SESSION_COOKIE}=`))
+      ?.split("=")[1];
+    if (token) {
+      const sess = verifySession(decodeURIComponent(token));
+      if (sess?.userId) userId = sess.userId;
+    }
+  } catch {
+    // игнорируем — анонимная отправка разрешена
+  }
+
   let db: Awaited<ReturnType<typeof getDb>>;
   try {
     db = await getDb();
@@ -147,6 +166,7 @@ export async function POST(request: Request) {
       sourceKind,
       repoUrl: body.repoUrl ?? null,
       status: "analyzing",
+      userId,
     })
     .returning({ id: submissions.id });
 

@@ -1,13 +1,13 @@
 /**
- * Оркестратор ревью SyntaxRay.
+ * Оркестратор ревью СинтексПруф.
  *
  * Шаги:
  *  1. Песочница — либо внешний FastAPI+Docker раннер (SANDBOX_API_URL),
  *     либо встроенный детерминированный движок (fallback).
- *  2. Семантическое ревью Gemini (если задан GEMINI_API_KEY).
+ *  2. Семантическое ревью ИИ (приоритет: Gigachat → YandexGPT → Gemini, см. AI_PROVIDER).
  *  3. Слияние находок, расчёт итоговых баллов и формирование отчёта.
  */
-import { GEMINI_MODEL_NAME, requestGeminiReview } from "@/lib/ai/gemini";
+import { requestAIReview, getActiveModelName } from "@/lib/ai/providers";
 import { runStaticAnalysis } from "@/lib/analyzer/static-engine";
 import type { AnalysisFinding, ReviewReport, SandboxReport, SourceFile } from "@/lib/types";
 
@@ -78,7 +78,7 @@ function heuristicReport(sandbox: SandboxReport, files: SourceFile[]): ReviewRep
     `Детерминированный анализ выявил ${findings.length} замечани(й), из них критических — ` +
     `${findings.filter((f) => f.severity === "critical").length}. ` +
     `Оценка худшей асимптотики по проекту — ${sandbox.complexity.estimate}. ` +
-    `Для семантического академического ревью подключите GEMINI_API_KEY в переменных окружения.`;
+    `Для семантического ревью подключите один из ключей: GIGACHAT_CLIENT_SECRET, YANDEX_API_KEY или GEMINI_API_KEY (AI_PROVIDER=auto).`;
 
   return {
     score,
@@ -145,37 +145,39 @@ export async function analyzeSubmission(params: {
   files: SourceFile[];
 }): Promise<ReviewReport> {
   const sandbox = await runSandbox(params.files);
-  const gemini = await requestGeminiReview({
+  const aiResult = await requestAIReview({
     title: params.title,
     language: params.language,
     files: params.files,
     sandbox,
   });
 
-  if (!gemini) {
+  if (!aiResult) {
     return heuristicReport(sandbox, params.files);
   }
 
-  // Слияние: приоритет у Gemini, детерминированные находки дополняют картину
+  const { review: aiReview, model } = aiResult;
+
+  // Слияние: приоритет у ИИ, детерминированные находки дополняют картину
   // (кроме дублей по «файл:строка»).
-  const geminiKeys = new Set(gemini.findings.map((f) => `${f.filePath}:${f.line}`));
+  const aiKeys = new Set(aiReview.findings.map((f) => `${f.filePath}:${f.line}`));
   const merged = [
-    ...gemini.findings,
-    ...sandbox.findings.filter((f) => !geminiKeys.has(`${f.filePath}:${f.line}`)),
+    ...aiReview.findings,
+    ...sandbox.findings.filter((f) => !aiKeys.has(`${f.filePath}:${f.line}`)),
   ].slice(0, 140);
 
   return {
-    score: gemini.score,
-    readability: gemini.readability,
-    architecture: gemini.architecture,
-    complexity: gemini.complexity || sandbox.complexity.estimate,
-    verdict: gemini.verdict || verdictFor(gemini.score),
-    summary: gemini.summary,
-    strengths: gemini.strengths,
-    risks: gemini.risks,
-    actionItems: gemini.actionItems,
-    sections: gemini.sections,
+    score: aiReview.score,
+    readability: aiReview.readability,
+    architecture: aiReview.architecture,
+    complexity: aiReview.complexity || sandbox.complexity.estimate,
+    verdict: aiReview.verdict || verdictFor(aiReview.score),
+    summary: aiReview.summary,
+    strengths: aiReview.strengths,
+    risks: aiReview.risks,
+    actionItems: aiReview.actionItems,
+    sections: aiReview.sections,
     sandbox: { ...sandbox, findings: merged },
-    engine: GEMINI_MODEL_NAME,
+    engine: model || getActiveModelName(),
   };
 }

@@ -1,5 +1,5 @@
 """
-SyntaxRay — серверная интеграция с Gemini API.
+СинтексПруф — серверная интеграция с Gemini API.
 
 Ключ читается ТОЛЬКО из переменной окружения GEMINI_API_KEY.
 В Docker-развёртывании передавайте его через env_file / secrets,
@@ -15,7 +15,7 @@ from typing import Any
 
 import httpx
 
-from .prompts import SYNTAXRAY_SYSTEM_PROMPT, build_user_prompt
+from .prompts import SINTEKSPROOF_SYSTEM_PROMPT, build_user_prompt
 
 logger = logging.getLogger("syntaxray.gemini")
 
@@ -106,7 +106,7 @@ async def review_with_gemini(
         return None
 
     body = {
-        "systemInstruction": {"parts": [{"text": SYNTAXRAY_SYSTEM_PROMPT}]},
+        "systemInstruction": {"parts": [{"text": SINTEKSPROOF_SYSTEM_PROMPT}]},
         "contents": [
             {"role": "user", "parts": [{"text": build_user_prompt(title, language, files, sandbox)}]}
         ],

@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 
 /**
  * ROI-калькулятор для лиц, принимающих решения: сколько часов и денег
- * кафедра экономит за семестр, отдав первичное ревью SyntaxRay.
+ * кафедра экономит за семестр, отдав первичное ревью СинтексПруф.
  */
 export function RoiCalculator() {
   const [students, setStudents] = useState(120);
@@ -41,7 +41,7 @@ export function RoiCalculator() {
           <Slider label="Минут на ручное ревью" value={minutes} min={5} max={60} step={5} onChange={setMinutes} />
           <p className="text-xs text-slate-500">
             Расчёт: {fmt(result.totalReviews)} проверок × {minutes} мин = {fmt(result.manualHours)} ч
-            ручной работы. SyntaxRay снимает ~80% рутины.
+            ручной работы. СинтексПруф снимает ~80% рутины.
           </p>
         </div>
 

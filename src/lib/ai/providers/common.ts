@@ -1,21 +1,15 @@
 /**
- * Клиент Gemini API (server-only).
- *
- * Ключ читается ИСКЛЮЧИТЕЛЬНО из переменной окружения GEMINI_API_KEY.
- * На Vercel: Project → Settings → Environment Variables → GEMINI_API_KEY.
- * Никогда не обращайтесь к этому модулю из клиентских компонентов.
+ * СинтексПруф — общие утилиты для ИИ-провайдеров.
+ * Используется Gemini, Gigachat, YandexGPT — единый формат промпта и нормализация ответа.
  */
 import { SYNTAXRAY_SYSTEM_PROMPT } from "@/lib/ai/system-prompt";
 import type { AnalysisFinding, SandboxReport, SourceFile } from "@/lib/types";
 
-function getModel(): string {
-  return process.env.GEMINI_MODEL ?? "gemini-2.5-flash";
-}
-const ENDPOINT = (model: string) =>
-  `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+export const SYNTAX_RAY_SYSTEM_PROMPT = SYNTAXRAY_SYSTEM_PROMPT;
+// Алиас для нового бренда
+export const SINTEKSPROOF_SYSTEM_PROMPT = SYNTAXRAY_SYSTEM_PROMPT;
 
-/** Ответ модели после валидации. */
-export interface GeminiReview {
+export interface AIReview {
   score: number;
   readability: number;
   architecture: number;
@@ -29,12 +23,7 @@ export interface GeminiReview {
   findings: AnalysisFinding[];
 }
 
-export function isGeminiConfigured(): boolean {
-  return Boolean(process.env.GEMINI_API_KEY);
-}
-
-/** Файлы с нумерацией строк — модель обязана ссылаться на эти номера. */
-function renderFiles(files: SourceFile[], budget = 46_000): string {
+export function renderFiles(files: SourceFile[], budget = 46_000): string {
   const chunks: string[] = [];
   let used = 0;
   for (const file of files) {
@@ -53,7 +42,7 @@ function renderFiles(files: SourceFile[], budget = 46_000): string {
   return chunks.join("");
 }
 
-function renderSandbox(sandbox: SandboxReport): string {
+export function renderSandbox(sandbox: SandboxReport): string {
   const m = sandbox.metrics;
   const top = sandbox.findings
     .slice(0, 40)
@@ -84,7 +73,7 @@ ${sandbox.log.join("\n")}
 `;
 }
 
-function buildUserPrompt(params: {
+export function buildUserPrompt(params: {
   title: string;
   language: string;
   files: SourceFile[];
@@ -103,8 +92,7 @@ ${renderFiles(params.files)}
 Проведи полное академическое ревью по всем осям A–F и верни строго JSON по заданной схеме.`;
 }
 
-/** Аккуратно достаём JSON, даже если модель обернула его в ```json. */
-function parseJsonBlock(text: string): unknown {
+export function parseJsonBlock(text: string): unknown {
   const cleaned = text
     .replace(/^\s*```(?:json)?/i, "")
     .replace(/```\s*$/i, "")
@@ -117,7 +105,7 @@ function parseJsonBlock(text: string): unknown {
     if (start >= 0 && end > start) {
       return JSON.parse(cleaned.slice(start, end + 1));
     }
-    throw new Error("Gemini вернул невалидный JSON");
+    throw new Error("Модель вернула невалидный JSON");
   }
 }
 
@@ -144,8 +132,7 @@ function toStringArray(value: unknown): string[] {
   return value.filter((v): v is string => typeof v === "string" && v.trim().length > 0).slice(0, 10);
 }
 
-/** Нормализация ответа модели + защита от «выдуманных» строк. */
-function normalize(raw: unknown, files: SourceFile[]): GeminiReview {
+export function normalizeAIResponse(raw: unknown, files: SourceFile[]): AIReview {
   const data = (raw ?? {}) as Record<string, unknown>;
   const lineLimits = new Map(files.map((f) => [f.path, f.content.split("\n").length]));
 
@@ -200,59 +187,7 @@ function normalize(raw: unknown, files: SourceFile[]): GeminiReview {
   };
 }
 
-/**
- * Вызов Gemini. Возвращает null, если ключ не задан или API недоступен —
- * в этом случае пайплайн деградирует до детерминированного отчёта.
- */
-export async function requestGeminiReview(params: {
-  title: string;
-  language: string;
-  files: SourceFile[];
-  sandbox: SandboxReport;
-}): Promise<GeminiReview | null> {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) return null;
-
-  const body = {
-    systemInstruction: { parts: [{ text: SYNTAXRAY_SYSTEM_PROMPT }] },
-    contents: [{ role: "user", parts: [{ text: buildUserPrompt(params) }] }],
-    generationConfig: {
-      temperature: 0.25,
-      topP: 0.9,
-      maxOutputTokens: 8192,
-      responseMimeType: "application/json",
-    },
-  };
-
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 90_000);
-  try {
-    const response = await fetch(ENDPOINT(getModel()), {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-      body: JSON.stringify(body),
-      signal: controller.signal,
-    });
-    if (!response.ok) {
-      console.error("[gemini] HTTP", response.status, (await response.text()).slice(0, 500));
-      return null;
-    }
-    const json = (await response.json()) as {
-      candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
-    };
-    const text = json.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("") ?? "";
-    if (!text.trim()) return null;
-    return normalize(parseJsonBlock(text), params.files);
-  } catch (error) {
-    console.error("[gemini] request failed:", error);
-    return null;
-  } finally {
-    clearTimeout(timeout);
-  }
-}
-
-/** Имя модели на момент вызова — читается лениво, чтобы Vercel не инлайнил env на этапе сборки. */
-export const GEMINI_MODEL_NAME = getModel();
-export function getGeminiModelName(): string {
-  return getModel();
+// Используется для пометки origin в зависимости от провайдера
+export function withOrigin(findings: AnalysisFinding[], origin: AnalysisFinding["origin"]): AnalysisFinding[] {
+  return findings.map((f) => ({ ...f, origin }));
 }

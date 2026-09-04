@@ -1,5 +1,5 @@
 /**
- * SyntaxRay — схема базы данных (Drizzle ORM / PostgreSQL).
+ * СинтексПруф — схема базы данных (Drizzle ORM / PostgreSQL).
  *
  * Модель данных описывает жизненный цикл ревью:
  *   submissions  — заявка на проверку (архив, репозиторий, вставленный код);
@@ -49,13 +49,18 @@ export const submissions = pgTable(
     summary: text("summary"),
     /** Полный отчёт: секции, метрики, лог песочницы */
     report: jsonb("report").$type<Record<string, unknown>>(),
-    /** gemini-2.5-flash | heuristic-engine */
+    /** gemini-2.5-flash | heuristic-engine | gigachat | yandexgpt */
     engine: varchar("engine", { length: 48 }).notNull().default("heuristic-engine"),
+    /** Владелец (если авторизован) */
+    userId: integer("user_id").references(() => users.id, { onDelete: "set null" }),
     durationMs: real("duration_ms"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     completedAt: timestamp("completed_at", { withTimezone: true }),
   },
-  (table) => [index("submissions_created_at_idx").on(table.createdAt)],
+  (table) => [
+    index("submissions_created_at_idx").on(table.createdAt),
+    index("submissions_user_idx").on(table.userId),
+  ],
 );
 
 /** Файл исходного кода внутри заявки. */
@@ -98,9 +103,73 @@ export const findings = pgTable(
   (table) => [index("findings_submission_idx").on(table.submissionId)],
 );
 
+/** Пользователь (для входа через Яндекс / VK / MAX / Госуслуги). */
+export const users = pgTable(
+  "users",
+  {
+    id: serial("id").primaryKey(),
+    email: varchar("email", { length: 320 }),
+    emailVerified: timestamp("email_verified", { withTimezone: true }),
+    name: varchar("name", { length: 120 }),
+    image: text("image"),
+    /** Провайдер последней авторизации: yandex | vk | max | gosuslugi */
+    provider: varchar("provider", { length: 32 }),
+    providerAccountId: varchar("provider_account_id", { length: 128 }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("users_email_idx").on(table.email),
+    index("users_provider_idx").on(table.provider, table.providerAccountId),
+  ],
+);
+
+/** Связка пользователя с OAuth-провайдером (для поддержки нескольких провайдеров у одного пользователя). */
+export const accounts = pgTable(
+  "accounts",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    type: varchar("type", { length: 32 }).notNull().default("oauth"),
+    provider: varchar("provider", { length: 32 }).notNull(),
+    providerAccountId: varchar("provider_account_id", { length: 128 }).notNull(),
+    refreshToken: text("refresh_token"),
+    accessToken: text("access_token"),
+    expiresAt: integer("expires_at"),
+    tokenType: varchar("token_type", { length: 32 }),
+    scope: text("scope"),
+    idToken: text("id_token"),
+    sessionState: text("session_state"),
+  },
+  (table) => [
+    index("accounts_user_idx").on(table.userId),
+    index("accounts_provider_idx").on(table.provider, table.providerAccountId),
+  ],
+);
+
+/** Сессия (JWT в cookie + запись в БД для отзыва). */
+export const sessions = pgTable(
+  "sessions",
+  {
+    id: serial("id").primaryKey(),
+    sessionToken: varchar("session_token", { length: 128 }).notNull().unique(),
+    userId: integer("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    expires: timestamp("expires", { withTimezone: true }).notNull(),
+  },
+  (table) => [index("sessions_user_idx").on(table.userId)],
+);
+
 export type Submission = typeof submissions.$inferSelect;
 export type NewSubmission = typeof submissions.$inferInsert;
 export type ReviewFile = typeof reviewFiles.$inferSelect;
 export type NewReviewFile = typeof reviewFiles.$inferInsert;
 export type Finding = typeof findings.$inferSelect;
 export type NewFinding = typeof findings.$inferInsert;
+export type User = typeof users.$inferSelect;
+export type NewUser = typeof users.$inferInsert;
+export type Account = typeof accounts.$inferSelect;
+export type Session = typeof sessions.$inferSelect;

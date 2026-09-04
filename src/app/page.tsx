@@ -5,15 +5,15 @@ import { findings, submissions } from "@/db/schema";
 import { Reveal } from "@/components/reveal";
 import { LiveDemo } from "@/components/live-demo";
 import { RoiCalculator } from "@/components/roi-calculator";
-import { isGeminiConfigured } from "@/lib/ai/gemini";
+import { getAvailableProviders, getActiveProviderName } from "@/lib/ai/providers";
 
 export const dynamic = "force-dynamic";
 
 const CAPABILITIES = [
   {
     icon: "🧠",
-    title: "Семантическое ревью Gemini",
-    text: "Академический системный промпт заставляет модель обосновывать каждое замечание последствиями в runtime, а не общими фразами.",
+    title: "Российские нейросети: YandexGPT и Gigachat",
+    text: "Приоритет отечественным моделям — YandexGPT и GigaChat. Академический промпт заставляет модель обосновывать каждое замечание последствиями в runtime. Gemini остаётся фолбэком.",
   },
   {
     icon: "📈",
@@ -45,7 +45,7 @@ const CAPABILITIES = [
 const PIPELINE = [
   { step: "01", title: "Загрузка", text: "Архив .zip, ссылка на GitHub или вставленный фрагмент кода." },
   { step: "02", title: "Песочница", text: "FastAPI поднимает контейнер, компилирует и прогоняет статические анализаторы." },
-  { step: "03", title: "ИИ-ревью", text: "Метрики и пронумерованный код уходят в Gemini с академическим промптом." },
+  { step: "03", title: "ИИ-ревью", text: "Метрики и пронумерованный код уходят в YandexGPT / GigaChat (или Gemini) с академическим промптом." },
   { step: "04", title: "Отчёт", text: "Замечания привязываются к строкам, выводится оценка, асимптотика и план правок." },
 ];
 
@@ -61,7 +61,17 @@ export default async function LandingPage() {
   } catch (error) {
     console.error("[landing] статистика БД недоступна:", error);
   }
-  const geminiOn = isGeminiConfigured();
+  const providers = getAvailableProviders();
+  const activeProvider = getActiveProviderName();
+  const aiOn = activeProvider !== "heuristic";
+  const providerLabel =
+    activeProvider === "gigachat"
+      ? "GigaChat подключён"
+      : activeProvider === "yandexgpt"
+        ? "YandexGPT подключён"
+        : activeProvider === "gemini"
+          ? "Gemini подключён"
+          : "Работает детерминированный движок";
 
   return (
     <div className="mx-auto max-w-7xl px-6 pb-24 pt-16">
@@ -69,8 +79,8 @@ export default async function LandingPage() {
       <section className="relative">
         <Reveal>
           <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs text-slate-300">
-            <span className={`h-1.5 w-1.5 rounded-full ${geminiOn ? "bg-emerald-400" : "bg-amber-400"}`} />
-            {geminiOn ? "Gemini API подключён" : "Работает детерминированный движок · добавьте GEMINI_API_KEY"}
+            <span className={`h-1.5 w-1.5 rounded-full ${aiOn ? "bg-emerald-400" : "bg-amber-400"}`} />
+            {aiOn ? providerLabel : "Детерминированный движок · добавьте GIGACHAT_ / YANDEX_ / GEMINI_ ключи"}
           </span>
         </Reveal>
 
@@ -82,7 +92,7 @@ export default async function LandingPage() {
 
         <Reveal delay={0.12}>
           <p className="mt-6 max-w-2xl text-lg leading-relaxed text-slate-400">
-            SyntaxRay проверяет работы студентов и участников хакатонов на C, C++ и Python: находит утечки памяти,
+            СинтексПруф проверяет работы студентов и участников хакатонов на C, C++ и Python: находит утечки памяти,
             неоптимальные алгоритмы и архитектурные ошибки — то, что не покажет ни один автотест LeetCode-типа.
           </p>
         </Reveal>
@@ -219,6 +229,39 @@ export default async function LandingPage() {
         </Reveal>
       </section>
 
+      {/* ВХОД ЧЕРЕЗ РОССИЙСКИЕ СЕРВИСЫ */}
+      <section className="mt-28">
+        <Reveal>
+          <h2 className="text-2xl font-semibold tracking-tight">Вход через российские сервисы</h2>
+          <p className="mt-2 text-slate-400">Яндекс, VK ID, MAX и Госуслуги — без паролей, с верификацией.</p>
+        </Reveal>
+        <div className="mt-8 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {[
+            { name: "Яндекс ID", color: "#FC3F1D", icon: "Я", desc: "Единый аккаунт Яндекса. Подходит всем студентам, мгновенный вход.", keys: "YANDEX_CLIENT_ID" },
+            { name: "VK ID", color: "#07F", icon: "VK", desc: "Быстрый вход для многомиллионной аудитории VK. OneTap, без пароля.", keys: "VK_CLIENT_ID" },
+            { name: "MAX", color: "#00E676", icon: "M", desc: "Новый мессенджер от VK. OAuth-совместим, удобен на хакатонах.", keys: "MAX_CLIENT_ID" },
+            { name: "Госуслуги", color: "#0D4CD3", icon: "ГУ", desc: "ЕСИА — верифицированный профиль для вузов и госкурсов.", keys: "GOSUSLUGI_CLIENT_ID" },
+          ].map((p, i) => (
+            <Reveal key={p.name} delay={0.06 * i}>
+              <div className="glass flex h-full flex-col rounded-2xl p-6">
+                <span className="grid h-10 w-10 place-items-center rounded-xl text-sm font-bold text-white" style={{ background: p.color }}>
+                  {p.icon}
+                </span>
+                <h3 className="mt-4 font-semibold text-slate-100">{p.name}</h3>
+                <p className="mt-2 flex-1 text-sm leading-relaxed text-slate-400">{p.desc}</p>
+                <span className="mt-4 font-mono text-[11px] text-slate-500">{p.keys}</span>
+              </div>
+            </Reveal>
+          ))}
+        </div>
+        <Reveal delay={0.24}>
+          <div className="mt-6 flex flex-wrap gap-3">
+            <Link href="/login" className="rounded-xl bg-gradient-to-r from-ray-400 to-violet-ray px-6 py-3 text-sm font-semibold text-ink-950">Попробовать вход</Link>
+            <Link href="/docs" className="glass rounded-xl px-6 py-3 text-sm text-slate-200">Документация по OAuth</Link>
+          </div>
+        </Reveal>
+      </section>
+
       {/* ТАРИФЫ */}
       <section className="mt-28">
         <Reveal>
@@ -299,7 +342,7 @@ export default async function LandingPage() {
               {[
                 { h: "Фронтенд", items: ["Next.js 16 (App Router)", "Tailwind CSS 4", "Framer Motion", "Monaco Editor", "Vercel"] },
                 { h: "Бэкенд", items: ["Python FastAPI", "Docker sandbox", "gcc / clang-tidy / cppcheck", "valgrind / ruff / radon"] },
-                { h: "ИИ и данные", items: ["Gemini API", "PostgreSQL + Drizzle ORM", "JSON-контракт findings", "Академический системный промпт"] },
+                { h: "ИИ и данные", items: ["YandexGPT · GigaChat · Gemini", "PostgreSQL + Drizzle ORM", "JSON-контракт findings", "Академический системный промпт"] },
               ].map((group) => (
                 <div key={group.h}>
                   <h3 className="font-mono text-xs uppercase tracking-[0.2em] text-ray-300">{group.h}</h3>
