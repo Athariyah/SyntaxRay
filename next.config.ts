@@ -12,6 +12,10 @@ const nextConfig: NextConfig = {
   // PGlite (встроенный PostgreSQL в Wasm) должен резолвиться из node_modules.
   serverExternalPackages: ["monaco-editor", "@electric-sql/pglite"],
 
+  outputFileTracingIncludes: {
+    "/*": ["./drizzle/**/*"],
+  },
+
   experimental: {
     // Уменьшаем размер клиентского бандла Framer Motion.
     optimizePackageImports: ["framer-motion"],
