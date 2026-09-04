@@ -6,10 +6,11 @@
  * Никогда не обращайтесь к этому модулю из клиентских компонентов.
  */
 import { SYNTAXRAY_SYSTEM_PROMPT } from "@/lib/ai/system-prompt";
+import type { DirectAIConfig } from "@/lib/ai/direct-config";
 import type { AnalysisFinding, SandboxReport, SourceFile } from "@/lib/types";
 
-function getModel(): string {
-  return process.env.GEMINI_MODEL ?? "gemini-2.5-flash";
+function getModel(config?: DirectAIConfig): string {
+  return config?.model?.trim() || process.env.GEMINI_MODEL || "gemini-2.5-flash";
 }
 const ENDPOINT = (model: string) =>
   `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
@@ -29,8 +30,8 @@ export interface GeminiReview {
   findings: AnalysisFinding[];
 }
 
-export function isGeminiConfigured(): boolean {
-  return Boolean(process.env.GEMINI_API_KEY);
+export function isGeminiConfigured(config?: DirectAIConfig): boolean {
+  return Boolean(config?.apiKey?.trim() || process.env.GEMINI_API_KEY);
 }
 
 /** Файлы с нумерацией строк — модель обязана ссылаться на эти номера. */
@@ -209,8 +210,9 @@ export async function requestGeminiReview(params: {
   language: string;
   files: SourceFile[];
   sandbox: SandboxReport;
+  aiConfig?: DirectAIConfig;
 }): Promise<GeminiReview | null> {
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = params.aiConfig?.apiKey?.trim() || process.env.GEMINI_API_KEY;
   if (!apiKey) return null;
 
   const body = {
@@ -225,9 +227,10 @@ export async function requestGeminiReview(params: {
   };
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 90_000);
+  const timeoutMs = params.aiConfig?.provider && params.aiConfig.provider !== "auto" ? 45_000 : 18_000;
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const response = await fetch(ENDPOINT(getModel()), {
+    const response = await fetch(ENDPOINT(getModel(params.aiConfig)), {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
       body: JSON.stringify(body),
@@ -253,6 +256,6 @@ export async function requestGeminiReview(params: {
 
 /** Имя модели на момент вызова — читается лениво, чтобы Vercel не инлайнил env на этапе сборки. */
 export const GEMINI_MODEL_NAME = getModel();
-export function getGeminiModelName(): string {
-  return getModel();
+export function getGeminiModelName(config?: DirectAIConfig): string {
+  return getModel(config);
 }

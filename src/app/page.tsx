@@ -5,7 +5,7 @@ import { findings, submissions } from "@/db/schema";
 import { Reveal } from "@/components/reveal";
 import { LiveDemo } from "@/components/live-demo";
 import { RoiCalculator } from "@/components/roi-calculator";
-import { getAvailableProviders, getActiveProviderName } from "@/lib/ai/providers";
+import { getActiveProviderName } from "@/lib/ai/providers";
 
 export const dynamic = "force-dynamic";
 
@@ -61,7 +61,6 @@ export default async function LandingPage() {
   } catch (error) {
     console.error("[landing] статистика БД недоступна:", error);
   }
-  const providers = getAvailableProviders();
   const activeProvider = getActiveProviderName();
   const aiOn = activeProvider !== "heuristic";
   const providerLabel =
@@ -226,39 +225,6 @@ export default async function LandingPage() {
       <section className="mt-28">
         <Reveal>
           <RoiCalculator />
-        </Reveal>
-      </section>
-
-      {/* ВХОД ЧЕРЕЗ РОССИЙСКИЕ СЕРВИСЫ */}
-      <section className="mt-28">
-        <Reveal>
-          <h2 className="text-2xl font-semibold tracking-tight">Вход через российские сервисы</h2>
-          <p className="mt-2 text-slate-400">Яндекс, VK ID, MAX и Госуслуги — без паролей, с верификацией.</p>
-        </Reveal>
-        <div className="mt-8 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          {[
-            { name: "Яндекс ID", color: "#FC3F1D", icon: "Я", desc: "Единый аккаунт Яндекса. Подходит всем студентам, мгновенный вход.", keys: "YANDEX_CLIENT_ID" },
-            { name: "VK ID", color: "#07F", icon: "VK", desc: "Быстрый вход для многомиллионной аудитории VK. OneTap, без пароля.", keys: "VK_CLIENT_ID" },
-            { name: "MAX", color: "#00E676", icon: "M", desc: "Новый мессенджер от VK. OAuth-совместим, удобен на хакатонах.", keys: "MAX_CLIENT_ID" },
-            { name: "Госуслуги", color: "#0D4CD3", icon: "ГУ", desc: "ЕСИА — верифицированный профиль для вузов и госкурсов.", keys: "GOSUSLUGI_CLIENT_ID" },
-          ].map((p, i) => (
-            <Reveal key={p.name} delay={0.06 * i}>
-              <div className="glass flex h-full flex-col rounded-2xl p-6">
-                <span className="grid h-10 w-10 place-items-center rounded-xl text-sm font-bold text-white" style={{ background: p.color }}>
-                  {p.icon}
-                </span>
-                <h3 className="mt-4 font-semibold text-slate-100">{p.name}</h3>
-                <p className="mt-2 flex-1 text-sm leading-relaxed text-slate-400">{p.desc}</p>
-                <span className="mt-4 font-mono text-[11px] text-slate-500">{p.keys}</span>
-              </div>
-            </Reveal>
-          ))}
-        </div>
-        <Reveal delay={0.24}>
-          <div className="mt-6 flex flex-wrap gap-3">
-            <Link href="/login" className="rounded-xl bg-gradient-to-r from-ray-400 to-violet-ray px-6 py-3 text-sm font-semibold text-ink-950">Попробовать вход</Link>
-            <Link href="/docs" className="glass rounded-xl px-6 py-3 text-sm text-slate-200">Документация по OAuth</Link>
-          </div>
         </Reveal>
       </section>
 

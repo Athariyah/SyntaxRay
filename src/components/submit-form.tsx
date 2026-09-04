@@ -7,6 +7,7 @@ import { AnalysisProgress } from "@/components/analysis-progress";
 import { isAnalyzableFile } from "@/lib/languages";
 
 type Mode = "paste" | "archive" | "repo";
+type AIProvider = "auto" | "gigachat" | "yandexgpt" | "gemini" | "heuristic";
 
 interface PendingFile {
   path: string;
@@ -49,6 +50,22 @@ const TABS: Array<{ id: Mode; label: string; hint: string }> = [
   { id: "repo", label: "GitHub-репозиторий", hint: "Публичная ссылка на репозиторий" },
 ];
 
+const AI_PROVIDERS: Array<{ id: AIProvider; label: string; hint: string }> = [
+  { id: "auto", label: "Авто из env", hint: "Сначала GigaChat, затем YandexGPT, затем Gemini" },
+  { id: "gigachat", label: "Сбер GigaChat", hint: "Разовый Authorization key или client_id:client_secret" },
+  { id: "yandexgpt", label: "YandexGPT", hint: "API-ключ Yandex Cloud + Folder ID" },
+  { id: "gemini", label: "Gemini", hint: "Оставлен как зарубежный fallback" },
+  { id: "heuristic", label: "Без ИИ", hint: "Только локальный статический анализ" },
+];
+
+const AI_MODELS: Record<AIProvider, string[]> = {
+  auto: ["auto"],
+  gigachat: ["GigaChat", "GigaChat-Pro", "GigaChat-Max", "GigaChat-2", "GigaChat-2-Pro", "GigaChat-2-Max"],
+  yandexgpt: ["yandexgpt", "yandexgpt-lite", "yandexgpt-pro"],
+  gemini: ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-flash"],
+  heuristic: ["heuristic-engine"],
+};
+
 export function SubmitForm() {
   const router = useRouter();
   const [mode, setMode] = useState<Mode>("paste");
@@ -59,6 +76,11 @@ export function SubmitForm() {
   const [fileName, setFileName] = useState("main.c");
   const [repoUrl, setRepoUrl] = useState("");
   const [archiveFiles, setArchiveFiles] = useState<PendingFile[]>([]);
+  const [aiProvider, setAiProvider] = useState<AIProvider>("auto");
+  const [aiModel, setAiModel] = useState("auto");
+  const [customAIModel, setCustomAIModel] = useState("");
+  const [aiKey, setAiKey] = useState("");
+  const [yandexFolderId, setYandexFolderId] = useState("");
   const [dragging, setDragging] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -94,6 +116,12 @@ export function SubmitForm() {
         author,
         cohort,
         sourceKind: mode,
+        aiConfig: {
+          provider: aiProvider,
+          model: aiModel === "custom" ? customAIModel : aiModel,
+          apiKey: aiKey,
+          folderId: yandexFolderId,
+        },
       };
       if (mode === "repo") {
         payload.repoUrl = repoUrl;
@@ -108,7 +136,13 @@ export function SubmitForm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      const data = (await response.json()) as { publicId?: string; error?: string };
+      const text = await response.text();
+      let data: { publicId?: string; error?: string } = {};
+      try {
+        data = text ? (JSON.parse(text) as { publicId?: string; error?: string }) : {};
+      } catch {
+        data = { error: text.slice(0, 300) || `HTTP ${response.status}` };
+      }
       // Заявка создана, даже если анализ упал (500 + publicId): ведём на
       // страницу ревью, где показан статус failed, а не «ошибка/404».
       if (data.publicId) {
@@ -123,11 +157,18 @@ export function SubmitForm() {
     }
   }
 
-  const canSubmit =
-    !busy &&
-    ((mode === "paste" && code.trim().length > 10) ||
-      (mode === "archive" && archiveFiles.length > 0) ||
-      (mode === "repo" && /github\.com\//i.test(repoUrl)));
+  const sourceReady =
+    (mode === "paste" && code.trim().length > 10) ||
+    (mode === "archive" && archiveFiles.length > 0) ||
+    (mode === "repo" && /github\.com\//i.test(repoUrl));
+  const selectedModel = aiModel === "custom" ? customAIModel.trim() : aiModel;
+  const aiReady =
+    aiProvider === "auto" ||
+    aiProvider === "heuristic" ||
+    (aiProvider === "yandexgpt"
+      ? Boolean(aiKey.trim() && (yandexFolderId.trim() || selectedModel.startsWith("gpt://")))
+      : Boolean(aiKey.trim()));
+  const canSubmit = !busy && sourceReady && aiReady;
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1.35fr_1fr]">
@@ -157,6 +198,105 @@ export function SubmitForm() {
           <Field label="Название работы" value={title} onChange={setTitle} placeholder="Лабораторная №4" />
           <Field label="Автор" value={author} onChange={setAuthor} placeholder="Иванов И." />
           <Field label="Группа / трек" value={cohort} onChange={setCohort} placeholder="БПИ-231" />
+        </div>
+
+        {/* Российская нейросеть для конкретного запуска */}
+        <div className="mt-6 rounded-2xl border border-ray-400/20 bg-ray-400/[0.04] p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-semibold text-slate-100">Нейросеть для ревью</h3>
+              <p className="mt-1 max-w-xl text-xs leading-relaxed text-slate-500">
+                Можно не настраивать переменные окружения: выберите модель и вставьте ключ только для этого запуска.
+                Ключ не сохраняется в базе и не попадает в отчёт.
+              </p>
+            </div>
+            <span className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2.5 py-1 text-[11px] text-emerald-200">
+              GigaChat / YandexGPT
+            </span>
+          </div>
+
+          <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_1fr]">
+            <label className="block">
+              <span className="mb-1.5 block text-xs uppercase tracking-wider text-slate-500">Провайдер</span>
+              <select
+                value={aiProvider}
+                onChange={(e) => {
+                  const provider = e.target.value as AIProvider;
+                  setAiProvider(provider);
+                  setAiModel(AI_MODELS[provider][0] ?? "auto");
+                  setCustomAIModel("");
+                }}
+                className="w-full rounded-lg border border-white/10 bg-ink-950/60 px-3.5 py-2.5 text-sm text-slate-200 focus:border-ray-400/50 focus:outline-none"
+              >
+                {AI_PROVIDERS.map((provider) => (
+                  <option key={provider.id} value={provider.id}>
+                    {provider.label}
+                  </option>
+                ))}
+              </select>
+              <span className="mt-1.5 block text-[11px] text-slate-500">
+                {AI_PROVIDERS.find((p) => p.id === aiProvider)?.hint}
+              </span>
+            </label>
+
+            <label className="block">
+              <span className="mb-1.5 block text-xs uppercase tracking-wider text-slate-500">Модель</span>
+              <select
+                value={aiModel}
+                onChange={(e) => setAiModel(e.target.value)}
+                disabled={aiProvider === "auto" || aiProvider === "heuristic"}
+                className="w-full rounded-lg border border-white/10 bg-ink-950/60 px-3.5 py-2.5 text-sm text-slate-200 disabled:opacity-60 focus:border-ray-400/50 focus:outline-none"
+              >
+                {AI_MODELS[aiProvider].map((model) => (
+                  <option key={model} value={model}>
+                    {model}
+                  </option>
+                ))}
+                {aiProvider !== "auto" && aiProvider !== "heuristic" && <option value="custom">Другая модель…</option>}
+              </select>
+            </label>
+          </div>
+
+          {aiModel === "custom" && aiProvider !== "auto" && aiProvider !== "heuristic" && (
+            <div className="mt-3">
+              <Field
+                label="Название модели / полный modelUri"
+                value={customAIModel}
+                onChange={setCustomAIModel}
+                placeholder={aiProvider === "yandexgpt" ? "yandexgpt или gpt://folder/yandexgpt/latest" : "GigaChat-Pro"}
+              />
+            </div>
+          )}
+
+          {aiProvider !== "auto" && aiProvider !== "heuristic" && (
+            <div className="mt-3 grid gap-3 lg:grid-cols-[1fr_0.7fr]">
+              <SecretField
+                label={aiProvider === "gigachat" ? "Ключ GigaChat" : aiProvider === "yandexgpt" ? "API-ключ Yandex Cloud" : "API-ключ"}
+                value={aiKey}
+                onChange={setAiKey}
+                placeholder={aiProvider === "gigachat" ? "Authorization key или client_id:client_secret" : "AQVN..."}
+              />
+              {aiProvider === "yandexgpt" ? (
+                <Field
+                  label="Folder ID"
+                  value={yandexFolderId}
+                  onChange={setYandexFolderId}
+                  placeholder="b1g..."
+                />
+              ) : (
+                <div className="rounded-xl border border-white/10 bg-ink-950/40 p-3 text-xs leading-relaxed text-slate-500">
+                  Для GigaChat достаточно ключа авторизации из кабинета Сбера; также принимается пара
+                  <span className="font-mono text-slate-300"> client_id:client_secret</span>.
+                </div>
+              )}
+            </div>
+          )}
+
+          {!aiReady && (
+            <p className="mt-3 rounded-lg border border-amber-400/25 bg-amber-400/10 px-3 py-2 text-xs text-amber-100">
+              Заполните ключ{aiProvider === "yandexgpt" ? " и Folder ID" : ""}, чтобы запустить ревью выбранной моделью.
+            </p>
+          )}
         </div>
 
         {/* Источник: мгновенное переключение без AnimatePresence mode="wait"
@@ -280,7 +420,7 @@ export function SubmitForm() {
                 {[
                   "Файлы сохраняются в PostgreSQL и передаются раннеру.",
                   "Docker-песочница компилирует код и собирает метрики.",
-                  "Gemini получает пронумерованный код и отчёт песочницы.",
+                  "Выбранная нейросеть получает пронумерованный код и отчёт песочницы.",
                   "Замечания привязываются к строкам и открываются в Monaco Editor.",
                 ].map((text, i) => (
                   <li key={text} className="flex gap-3">
@@ -293,7 +433,7 @@ export function SubmitForm() {
                 <p className="font-mono text-[11px] uppercase tracking-widest text-slate-500">Лимиты</p>
                 <ul className="mt-2 space-y-1 text-xs text-slate-400">
                   <li>• до 25 файлов и 400 000 символов на заявку</li>
-                  <li>• таймаут ревью — 90 секунд</li>
+                  <li>• таймаут ревью — до 60 секунд на Vercel Hobby</li>
                   <li>• поддерживаются C, C++ (17/20) и Python 3</li>
                 </ul>
               </div>
@@ -324,6 +464,32 @@ function Field({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
+        className="w-full rounded-lg border border-white/10 bg-ink-950/60 px-3.5 py-2.5 text-sm text-slate-200 placeholder:text-slate-600 focus:border-ray-400/50 focus:outline-none"
+      />
+    </label>
+  );
+}
+
+function SecretField({
+  label,
+  value,
+  onChange,
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-1.5 block text-xs uppercase tracking-wider text-slate-500">{label}</span>
+      <input
+        type="password"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        autoComplete="off"
         className="w-full rounded-lg border border-white/10 bg-ink-950/60 px-3.5 py-2.5 text-sm text-slate-200 placeholder:text-slate-600 focus:border-ray-400/50 focus:outline-none"
       />
     </label>

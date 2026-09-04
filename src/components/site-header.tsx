@@ -20,11 +20,12 @@ export function SiteHeader() {
     <header className="sticky top-0 z-50 border-b border-white/5 bg-ink-950/70 backdrop-blur-xl">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-6">
         <Link href="/" className="group flex items-center gap-3" onClick={() => setOpen(false)}>
-          <span className="relative grid h-9 w-9 place-items-center rounded-xl border border-ray-400/30 bg-ray-400/10">
-            <svg viewBox="0 0 24 24" className="h-5 w-5 text-ray-300" fill="none" strokeWidth="1.8">
-              <path d="M9 6 4 12l5 6" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="m15 6 5 6-5 6" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M12.5 4.5 11 19.5" stroke="currentColor" strokeLinecap="round" opacity="0.55" />
+          <span className="relative grid h-10 w-10 place-items-center rounded-2xl border border-ray-300/35 bg-gradient-to-br from-ray-300 via-ray-400 to-violet-ray shadow-[0_0_35px_-14px_rgba(56,211,245,0.95)]">
+            <svg viewBox="0 0 28 28" className="h-6 w-6 text-ink-950" fill="none" strokeWidth="2.2" aria-hidden="true">
+              <path d="M14 3.5 23 7.4v6.3c0 6.2-3.4 10.8-9 12.8-5.6-2-9-6.6-9-12.8V7.4l9-3.9Z" fill="currentColor" opacity="0.18" />
+              <path d="M10.6 10 7.3 14l3.3 4" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="m17.4 10 3.3 4-3.3 4" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="m15.2 8.4-2.4 11.2" stroke="currentColor" strokeLinecap="round" opacity="0.75" />
             </svg>
           </span>
           <span className="flex flex-col leading-none">
@@ -114,13 +115,7 @@ export function SiteHeader() {
           >
             Загрузить код
           </Link>
-          <Link
-            href="/login"
-            onClick={() => setOpen(false)}
-            className="mt-2 block rounded-lg border border-white/10 px-3 py-2.5 text-center text-sm text-slate-300"
-          >
-            Войти через Яндекс / VK / MAX / Госуслуги
-          </Link>
+
         </nav>
       )}
     </header>
