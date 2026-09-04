@@ -101,8 +101,8 @@ export function FullAuthPanel() {
 }
 
 function providerIconBackground(name: string, color: string): string {
-  if (name === "gosuslugi") return "linear-gradient(135deg,#0D4CD3 0%,#0D4CD3 48%,#EE3F58 49%,#EE3F58 100%)";
-  if (name === "max") return "linear-gradient(135deg,#05C7F2,#0077FF)";
+  if (name === "gosuslugi") return "linear-gradient(160deg,#0A5C9E 0%,#0051A2 100%)";
+  if (name === "max") return "linear-gradient(135deg,#4A90E2 0%,#9B59D6 100%)";
   return color;
 }
 
@@ -119,19 +119,22 @@ function ProviderIcon({ name }: { name: string }) {
   }
   if (name === "max") {
     return (
-      <svg viewBox="0 0 28 28" className="h-7 w-7 text-white" aria-hidden="true">
+      <svg viewBox="0 0 28 28" className="h-7 w-7 text-white" fill="none" aria-hidden="true">
         <path
-          fill="currentColor"
-          d="M7 8.2c0-1.4 1.1-2.5 2.5-2.5h9c1.4 0 2.5 1.1 2.5 2.5v7.1c0 1.4-1.1 2.5-2.5 2.5h-5.2l-4.5 4.1v-4.1A2.5 2.5 0 0 1 7 15.3V8.2Zm3.2 2.1v5.2h1.8v-2.8l1.6 2.1h.8l1.6-2.1v2.8h1.8v-5.2h-1.6l-2.2 2.8-2.2-2.8h-1.6Z"
+          d="M7 10a2.8 2.8 0 0 1 2.8-2.8h8.4a2.8 2.8 0 0 1 2.8 2.8v5a2.8 2.8 0 0 1-2.8 2.8h-3.6l-3 2.8v-2.8h-1.8A2.8 2.8 0 0 1 7 15v-5Z"
+          stroke="currentColor"
+          strokeWidth="2.2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
         />
       </svg>
     );
   }
   if (name === "gosuslugi") {
     return (
-      <svg viewBox="0 0 28 28" className="h-7 w-7 text-white" aria-hidden="true">
-        <path fill="currentColor" d="M7 7h14v3H7V7Zm0 5h14v3H7v-3Zm0 5h10v3H7v-3Z" />
-        <circle cx="21" cy="18.5" r="2" fill="currentColor" opacity="0.9" />
+      <svg viewBox="0 0 28 28" className="h-7 w-7 text-white" fill="currentColor" fillRule="evenodd" aria-hidden="true">
+        <circle cx="14" cy="6.9" r="3.1" />
+        <path d="M8 10.3h12v1.6c0 3.7-2.7 6.6-6 6.6s-6-2.9-6-6.6v-1.6Zm4.2 1.1h3.6v3.4a1.8 1.8 0 0 1-3.6 0v-3.4Z" />
       </svg>
     );
   }

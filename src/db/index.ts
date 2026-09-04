@@ -193,6 +193,15 @@ function resolveDatabaseUrl(): string | undefined {
   return undefined;
 }
 
+/**
+ * Есть ли постоянная БД (внешний PostgreSQL). Если нет — данные живут
+ * в эфемерной PGlite одного инстанса функции и не разделяются между
+ * API-роутом и страницей ревью на serverless-деплое.
+ */
+export function isPersistentDatabaseConfigured(): boolean {
+  return Boolean(resolveDatabaseUrl());
+}
+
 /** Создать клиент Drizzle поверх выбранного движка. */
 async function createDb(): Promise<Db> {
   const databaseUrl = resolveDatabaseUrl();
