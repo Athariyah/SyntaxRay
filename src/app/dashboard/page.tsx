@@ -1,11 +1,26 @@
 import Link from "next/link";
-import { count, desc, eq, sql } from "drizzle-orm";
+import { count, desc, eq, inArray, sql } from "drizzle-orm";
 import { getDb } from "@/db";
-import { findings, submissions } from "@/db/schema";
+import { findings, reviewFiles, submissions } from "@/db/schema";
 import { Reveal } from "@/components/reveal";
 import { SubmissionsTable, type SubmissionRow } from "@/components/submissions-table";
+import { Analytics, type AnalyticsData } from "@/components/analytics";
+import { SimilarityCard } from "@/components/similarity-card";
+import { topSimilarPairs } from "@/lib/similarity";
+import type { SimilarPair } from "@/lib/similarity";
 
 export const dynamic = "force-dynamic";
+
+const CATEGORY_LABEL: Record<string, string> = {
+  memory: "Память",
+  pointers: "Указатели",
+  complexity: "Сложность",
+  architecture: "Архитектура",
+  readability: "Читаемость",
+  security: "Безопасность",
+  style: "Стиль",
+  correctness: "Корректность",
+};
 
 export default async function DashboardPage() {
   // Дашборд не должен падать с 500, если БД недоступна
@@ -26,6 +41,10 @@ export default async function DashboardPage() {
     findingsCount: number;
     criticalCount: number;
   }> = [];
+  let severityRows: Array<{ severity: string; count: number }> = [];
+  let categoryRows: Array<{ category: string; count: number }> = [];
+  let pairs: SimilarPair[] = [];
+
   try {
     const db = await getDb();
     rows = await db
@@ -53,6 +72,48 @@ export default async function DashboardPage() {
       .groupBy(submissions.id)
       .orderBy(desc(submissions.createdAt))
       .limit(60);
+
+    [severityRows, categoryRows] = await Promise.all([
+      db.select({ severity: findings.severity, count: count() }).from(findings).groupBy(findings.severity),
+      db.select({ category: findings.category, count: count() }).from(findings).groupBy(findings.category),
+    ]);
+
+    // Антиплагиат: берём до 25 последних завершённых работ с текстами
+    // (первые 20К символов файла достаточно для фингерпринта).
+    const completedIds = rows
+      .filter((r) => r.status === "completed")
+      .slice(0, 25)
+      .map((r) => r.publicId);
+    if (completedIds.length >= 2) {
+      const fileRows = await db
+        .select({
+          publicId: submissions.publicId,
+          title: submissions.title,
+          author: submissions.author,
+          language: submissions.language,
+          content: sql<string>`substring(${reviewFiles.content}, 1, 20000)`,
+        })
+        .from(submissions)
+        .innerJoin(reviewFiles, eq(reviewFiles.submissionId, submissions.id))
+        .where(inArray(submissions.publicId, completedIds));
+
+      const byId = new Map<
+        string,
+        { publicId: string; title: string; author: string; language: string; contents: string[] }
+      >();
+      for (const fr of fileRows) {
+        const entry = byId.get(fr.publicId) ?? {
+          publicId: fr.publicId,
+          title: fr.title,
+          author: fr.author,
+          language: fr.language,
+          contents: [],
+        };
+        if (entry.contents.length < 25 && fr.content) entry.contents.push(fr.content);
+        byId.set(fr.publicId, entry);
+      }
+      pairs = topSimilarPairs(Array.from(byId.values()), 4, 0.45);
+    }
   } catch (error) {
     console.error("[dashboard] БД недоступна:", error);
   }
@@ -76,6 +137,42 @@ export default async function DashboardPage() {
     { label: "Замечаний", value: totalFindings, hint: `${totalCritical} критических` },
     { label: "Полиномиальная сложность", value: quadratic, hint: "работ с O(N²) и хуже" },
   ];
+
+  const analytics: AnalyticsData = {
+    histogram: (() => {
+      const buckets = Array(10).fill(0) as number[];
+      for (const r of completed) {
+        if (r.score === null) continue;
+        buckets[Math.min(9, Math.floor(r.score / 10))] += 1;
+      }
+      return buckets;
+    })(),
+    severity: {
+      critical: severityRows.find((r) => r.severity === "critical")?.count ?? 0,
+      major: severityRows.find((r) => r.severity === "major")?.count ?? 0,
+      minor: severityRows.find((r) => r.severity === "minor")?.count ?? 0,
+      info: severityRows.find((r) => r.severity === "info")?.count ?? 0,
+    },
+    categories: categoryRows
+      .map((r) => ({ key: r.category, label: CATEGORY_LABEL[r.category] ?? r.category, count: r.count }))
+      .sort((a, b) => b.count - a.count),
+    trend: (() => {
+      const byDay = new Map<string, { sum: number; n: number; ts: number }>();
+      for (const r of completed) {
+        if (r.score === null) continue;
+        const d = new Date(r.createdAt);
+        const key = d.toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit" });
+        const entry = byDay.get(key) ?? { sum: 0, n: 0, ts: d.getTime() };
+        entry.sum += r.score;
+        entry.n += 1;
+        byDay.set(key, entry);
+      }
+      return Array.from(byDay.entries())
+        .sort((a, b) => a[1].ts - b[1].ts)
+        .slice(-14)
+        .map(([day, v]) => ({ day, avg: Math.round(v.sum / v.n), n: v.n }));
+    })(),
+  };
 
   return (
     <div className="mx-auto max-w-7xl px-6 py-12">
@@ -109,9 +206,31 @@ export default async function DashboardPage() {
       </div>
 
       <div className="mt-8">
-        <Reveal delay={0.1}>
+        <Reveal delay={0.05}>
+          <Analytics data={analytics} />
+        </Reveal>
+      </div>
+
+      <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_380px]">
+        <Reveal delay={0.08}>
           <SubmissionsTable rows={serialized} />
         </Reveal>
+        <div className="space-y-4">
+          <Reveal delay={0.1}>
+            <SimilarityCard pairs={pairs} />
+          </Reveal>
+          <Reveal delay={0.12}>
+            <div className="glass rounded-2xl p-5">
+              <h3 className="text-sm font-semibold text-slate-100">Как читать дашборд</h3>
+              <ul className="mt-3 space-y-2 text-xs leading-relaxed text-slate-400">
+                <li>• <span className="text-slate-200">Гистограмма влево</span> — тема не усвоена, разберите её на занятии.</li>
+                <li>• <span className="text-slate-200">Рост критических</span> — запретите опасные функции: `gets`, `strcpy` без `n`, `malloc` без проверки.</li>
+                <li>• <span className="text-slate-200">Пара в антиплагиате {">"}70%</span> — откройте оба ревью и сравните построчно.</li>
+                <li>• <span className="text-slate-200">Тренд вниз</span> — следующее задание оказалось сложнее, скорректируйте дедлайн.</li>
+              </ul>
+            </div>
+          </Reveal>
+        </div>
       </div>
     </div>
   );

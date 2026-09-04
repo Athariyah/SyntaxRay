@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
 import type { OnMount } from "@monaco-editor/react";
-import type { editor, IDisposable } from "monaco-editor";
+import type { editor } from "monaco-editor";
 import type { Severity } from "@/lib/types";
 import { monacoLanguage } from "@/lib/languages";
 
@@ -11,7 +11,7 @@ import { monacoLanguage } from "@/lib/languages";
 const MonacoEditor = dynamic(() => import("@monaco-editor/react").then((m) => m.Editor), {
   ssr: false,
   loading: () => (
-    <div className="space-y-2 p-6">
+    <div className="space-y-2 p-6" aria-label="Загрузка редактора">
       {Array.from({ length: 14 }).map((_, i) => (
         <div key={i} className="skeleton h-3" style={{ width: `${45 + ((i * 13) % 50)}%` }} />
       ))}
@@ -37,70 +37,81 @@ const SEVERITY_TO_MONACO: Record<Severity, number> = {
   info: 1, // Hint
 };
 
+/** Больше маркеров за раз Monaco отрисовывает с просадкой — остальное видно в панели. */
+const MAX_RENDERED_MARKERS = 250;
+
 export function CodeViewer({
   path,
   language,
   content,
   markers,
   activeLine,
-  onSelectLine,
 }: {
   path: string;
   language: string;
   content: string;
   markers: EditorMarker[];
   activeLine: number | null;
-  onSelectLine: (line: number) => void;
 }) {
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
   const monacoRef = useRef<typeof import("monaco-editor") | null>(null);
   const decorationsRef = useRef<editor.IEditorDecorationsCollection | null>(null);
-  const listenerRef = useRef<IDisposable | null>(null);
 
-  const applyAnnotations = () => {
+  const applyAnnotations = (current: EditorMarker[]) => {
     const monaco = monacoRef.current;
     const ed = editorRef.current;
     const model = ed?.getModel();
     if (!monaco || !ed || !model) return;
+    const lineCount = model.getLineCount();
+
+    const clamped = current
+      .filter((m) => m.line >= 1 && m.line <= lineCount)
+      .slice(0, MAX_RENDERED_MARKERS);
 
     // 1. Маркеры проблем — подчёркивание + список в Problems
     monaco.editor.setModelMarkers(
       model,
       "syntaxray",
-      markers.map((m) => ({
-        startLineNumber: m.line,
-        endLineNumber: m.endLine ?? m.line,
-        startColumn: 1,
-        endColumn: model.getLineMaxColumn(Math.min(m.endLine ?? m.line, model.getLineCount())),
-        severity: SEVERITY_TO_MONACO[m.severity],
-        message: `${m.title}\n\n${m.message}${m.suggestion ? `\n\n💡 ${m.suggestion}` : ""}`,
-        source: m.origin === "gemini" ? "SyntaxRay · Gemini" : "SyntaxRay · Static",
-      })),
+      clamped.map((m) => {
+        const endLine = Math.max(m.line, Math.min(m.endLine ?? m.line, lineCount));
+        return {
+          startLineNumber: m.line,
+          endLineNumber: endLine,
+          startColumn: 1,
+          endColumn: model.getLineMaxColumn(endLine),
+          severity: SEVERITY_TO_MONACO[m.severity],
+          message: `${m.title}\n\n${m.message}${m.suggestion ? `\n\nКак исправить: ${m.suggestion}` : ""}`,
+          source: m.origin === "gemini" ? "SyntaxRay · Gemini" : "SyntaxRay · Static",
+        };
+      }),
     );
 
     // 2. Декорации строк — glyph-полоса и фоновая подсветка
     decorationsRef.current?.clear();
     decorationsRef.current = ed.createDecorationsCollection(
-      markers.map((m) => ({
-        range: new monaco.Range(m.line, 1, m.endLine ?? m.line, 1),
-        options: {
-          isWholeLine: true,
-          className: `sr-line-${m.severity}`,
-          glyphMarginClassName: `sr-glyph-${m.severity}`,
-          glyphMarginHoverMessage: { value: `**${m.title}**\n\n${m.message}` },
-          overviewRuler: {
-            color:
-              m.severity === "critical"
-                ? "#ff5d7a"
-                : m.severity === "major"
-                  ? "#ffb454"
-                  : m.severity === "minor"
-                    ? "#38d3f5"
-                    : "#8b7bff",
-            position: 4,
+      clamped.map((m) => {
+        const endLine = Math.max(m.line, Math.min(m.endLine ?? m.line, lineCount));
+        return {
+          range: new monaco.Range(m.line, 1, endLine, 1),
+          options: {
+            isWholeLine: true,
+            className: `sr-line-${m.severity}`,
+            glyphMarginClassName: `sr-glyph-${m.severity}`,
+            glyphMarginHoverMessage: { value: `**${m.title}**\n\n${m.message}` },
+            overviewRuler: {
+              color:
+                m.severity === "critical"
+                  ? "#ff5d7a"
+                  : m.severity === "major"
+                    ? "#ffb454"
+                    : m.severity === "minor"
+                      ? "#38d3f5"
+                      : "#8b7bff",
+              position: 4,
+            },
           },
-        },
-      })),
+        };
+      }),
     );
   };
 
@@ -129,15 +140,18 @@ export function CodeViewer({
       },
     });
     monaco.editor.setTheme("syntaxray-dark");
+    // handleMount вызывается Monaco после коммита: замыкание видит
+    // актуальные пропсы этого рендера, поэтому передаём их явно.
+    applyAnnotations(markers);
 
-    listenerRef.current?.dispose();
-    listenerRef.current = ed.onDidChangeCursorPosition((e) => onSelectLine(e.position.lineNumber));
-    applyAnnotations();
+    if (activeLine) {
+      ed.revealLineInCenter(activeLine);
+      ed.setPosition({ lineNumber: activeLine, column: 1 });
+    }
   };
 
   useEffect(() => {
-    applyAnnotations();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    applyAnnotations(markers);
   }, [markers, path, content]);
 
   useEffect(() => {
@@ -148,7 +162,25 @@ export function CodeViewer({
     }
   }, [activeLine]);
 
-  useEffect(() => () => listenerRef.current?.dispose(), []);
+  // При уходе со страницы диспоузим модель редактора: раньше каждая смена
+  // файла через `path` создавала новую Monaco-модель, старые копились
+  // в памяти и редактор со временем начинал тормозить.
+  useEffect(
+    () => () => {
+      try {
+        decorationsRef.current?.clear();
+        editorRef.current?.getModel()?.dispose();
+      } catch {
+        /* Monaco уже выгружен — нечего чистить */
+      }
+      editorRef.current = null;
+      monacoRef.current = null;
+    },
+    [],
+  );
+
+  const lineCount = content.split("\n").length;
+  const heavy = lineCount > 2000 || content.length > 120_000;
 
   return (
     <MonacoEditor
@@ -165,16 +197,25 @@ export function CodeViewer({
         fontSize: 13,
         lineHeight: 21,
         fontFamily: "var(--font-mono)",
-        fontLigatures: true,
-        minimap: { enabled: true, renderCharacters: false, maxColumn: 70 },
+        fontLigatures: false,
+        // Тяжёлые опции выключены осознанно: smoothScrolling и
+        // cursorSmoothCaretAnimation давали микрофризы при прокрутке
+        // больших файлов, stickyScroll — лишние пересчёты layout.
+        minimap: heavy ? { enabled: false } : { enabled: true, renderCharacters: false, maxColumn: 70 },
         scrollBeyondLastLine: false,
-        smoothScrolling: true,
-        cursorSmoothCaretAnimation: "on",
-        renderLineHighlight: "all",
+        smoothScrolling: false,
+        cursorSmoothCaretAnimation: "off",
+        cursorBlinking: "solid",
+        renderLineHighlight: "line",
         padding: { top: 16, bottom: 24 },
         scrollbar: { verticalScrollbarSize: 10, horizontalScrollbarSize: 10 },
         overviewRulerBorder: false,
-        stickyScroll: { enabled: true },
+        stickyScroll: { enabled: false },
+        hover: { delay: 250 },
+        renderValidationDecorations: "on",
+        occurrencesHighlight: "off",
+        selectionHighlight: false,
+        links: false,
       }}
     />
   );
