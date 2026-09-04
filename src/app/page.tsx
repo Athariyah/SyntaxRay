@@ -48,9 +48,17 @@ const PIPELINE = [
 ];
 
 export default async function LandingPage() {
-  const db = await getDb();
-  const [submissionStats] = await db.select({ value: count() }).from(submissions);
-  const [findingStats] = await db.select({ value: count() }).from(findings);
+  // Статистика не должна ронять лендинг, если БД недоступна
+  // (например, не задан DATABASE_URL на свежем деплое).
+  let submissionStats: { value: number } | undefined;
+  let findingStats: { value: number } | undefined;
+  try {
+    const db = await getDb();
+    [submissionStats] = await db.select({ value: count() }).from(submissions);
+    [findingStats] = await db.select({ value: count() }).from(findings);
+  } catch (error) {
+    console.error("[landing] статистика БД недоступна:", error);
+  }
   const geminiOn = isGeminiConfigured();
 
   return (

@@ -73,14 +73,22 @@ curl http://localhost:8000/health`,
   },
   {
     title: "3. Развёртывание на Vercel",
-    code: `vercel link
-vercel env add GEMINI_API_KEY production
-vercel env add DATABASE_URL production
-vercel env add SANDBOX_API_URL production   # URL вашего FastAPI-раннера
+    code: `# На Vercel деплоится только фронтенд (Next.js).
+# Бэкенд с Docker-песочницей там не работает — поднимите его отдельно
+# (VPS / Render / Railway) либо оставьте SANDBOX_API_URL пустым:
+# тогда используется встроенный TypeScript-движок анализа.
+vercel link
+vercel env add DATABASE_URL production    # Neon / Supabase / Vercel Postgres
+vercel env add GEMINI_API_KEY production  # опционально, для ИИ-ревью
+vercel env add SANDBOX_API_URL production # опционально, URL внешнего раннера
 vercel --prod
 
-# Ревью синхронное и может занять до 90 c:
-# в vercel.json увеличен maxDuration для /api/submissions.`,
+# Без DATABASE_URL данные живут во встроенной PGlite в /tmp (эфемерно).
+# Для production: задайте DATABASE_URL и выполните npx drizzle-kit push.
+#
+# Ревью синхронное, лимит функции — 60 c (максимум тарифа Hobby):
+# export const maxDuration = 60 в src/app/api/submissions/route.ts.
+# Не включайте режим Services в настройках проекта.`,
   },
   {
     title: "4. Контракт песочницы (FastAPI → Next.js)",
