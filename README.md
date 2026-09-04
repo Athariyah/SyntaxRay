@@ -111,19 +111,34 @@ curl http://localhost:8000/health     # {"status":"ok","docker":true,"gemini":tr
 
 ## 5. Развёртывание на Vercel
 
+На Vercel деплоится **только фронтенд (Next.js)** — проект собирается как обычное
+Next.js-приложение, отдельный `vercel.json` для этого не требуется.
+FastAPI-песочница на Vercel **не работает** (там нет Docker, `docker.sock` и тулчейна
+gcc/cppcheck/valgrind): поднимите её отдельно (VPS / Render / Railway через
+`docker compose`) и укажите URL через `SANDBOX_API_URL`, либо оставьте поле пустым —
+тогда используется встроенный TypeScript-движок статического анализа.
+
 ```bash
 vercel link
-vercel env add DATABASE_URL production
-vercel env add GEMINI_API_KEY production
-vercel env add SANDBOX_API_URL production   # опционально
+vercel env add DATABASE_URL production    # Neon / Supabase / Vercel Postgres
+vercel env add GEMINI_API_KEY production  # опционально, для ИИ-ревью
+vercel env add SANDBOX_API_URL production # опционально, URL внешнего раннера
 vercel --prod
 ```
 
-`vercel.json` описывает два сервиса: `frontend` (Next.js, корень репозитория) и `backend`
-(FastAPI-песочница, каталог `backend/`), и маршрутизирует `/api/backend/*` на FastAPI.
-Лимит `maxDuration` для `/api/submissions` (120 c, ревью синхронное) задан в коде роута
-(`export const maxDuration = 120`).
-Для планов без длинных функций вынесите анализ в очередь или полностью на FastAPI-раннер.
+Что важно знать:
+
+* Без `DATABASE_URL` данные хранятся во встроенной PGlite. Локально это каталог
+  `./.pglite`, а на Vercel (файловая система read-only) — `/tmp`, поэтому после
+  каждого холодного старта база пустая. Для production задайте `DATABASE_URL`
+  и примените миграции: `npx drizzle-kit push`.
+* Лимит `maxDuration` для `/api/submissions` (ревью синхронное) задан в коде роута
+  (`export const maxDuration = 60`): 60 c — максимум тарифа Hobby. На Pro можно
+  поднять до 300. Если ревью не укладывается в лимит — вынесите анализ в очередь
+  или полностью на FastAPI-раннер.
+* Не включайте в настройках проекта режим **Services** и не добавляйте в
+  `vercel.json` секции `services` / объектные `rewrites` — это бета-режим
+  микросервисов, без него деплой падает с ошибкой валидации `vercel.json`.
 
 ## 6. Безопасность песочницы
 

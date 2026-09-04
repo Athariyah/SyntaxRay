@@ -13,7 +13,10 @@ import type { SourceFile } from "@/lib/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 120;
+// Лимит выполнения функции. На тарифе Hobby максимум — 60 c
+// (значение 120 роняло деплой с ошибкой maxDuration).
+// На Pro можно поднять до 300.
+export const maxDuration = 60;
 
 const MAX_FILES = 25;
 const MAX_TOTAL_CHARS = 400_000;
@@ -22,8 +25,21 @@ function publicId(): string {
   return `sr_${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36).slice(-4)}`;
 }
 
+function dbUnavailable() {
+  return NextResponse.json(
+    { error: "База данных недоступна. Задайте DATABASE_URL в переменных окружения Vercel и примените миграции (npx drizzle-kit push)." },
+    { status: 503 },
+  );
+}
+
 export async function GET() {
-  const db = await getDb();
+  let db: Awaited<ReturnType<typeof getDb>>;
+  try {
+    db = await getDb();
+  } catch (error) {
+    console.error("[submissions] БД недоступна:", error);
+    return dbUnavailable();
+  }
   const rows = await db
     .select({
       publicId: submissions.publicId,
@@ -112,7 +128,13 @@ export async function POST(request: Request) {
   const language = aggregateLanguage(files.map((f) => f.language));
   const title = (body.title?.trim() || files[0].path).slice(0, 200);
   const id = publicId();
-  const db = await getDb();
+  let db: Awaited<ReturnType<typeof getDb>>;
+  try {
+    db = await getDb();
+  } catch (error) {
+    console.error("[submissions] БД недоступна:", error);
+    return dbUnavailable();
+  }
 
   const [created] = await db
     .insert(submissions)

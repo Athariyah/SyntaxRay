@@ -19,28 +19,38 @@ export default async function ReviewPage({
   params: Promise<{ publicId: string }>;
 }) {
   const { publicId } = await params;
-  const db = await getDb();
+  let submission: typeof submissions.$inferSelect | undefined;
+  let files: Array<typeof reviewFiles.$inferSelect> = [];
+  let issues: Array<typeof findingsTable.$inferSelect> = [];
+  try {
+    const db = await getDb();
 
-  const [submission] = await db
-    .select()
-    .from(submissions)
-    .where(eq(submissions.publicId, publicId))
-    .limit(1);
+    [submission] = await db
+      .select()
+      .from(submissions)
+      .where(eq(submissions.publicId, publicId))
+      .limit(1);
+
+    if (!submission) notFound();
+
+    [files, issues] = await Promise.all([
+      db
+        .select()
+        .from(reviewFiles)
+        .where(eq(reviewFiles.submissionId, submission.id))
+        .orderBy(asc(reviewFiles.path)),
+      db
+        .select()
+        .from(findingsTable)
+        .where(eq(findingsTable.submissionId, submission.id))
+        .orderBy(asc(findingsTable.line)),
+    ]);
+  } catch (error) {
+    console.error("[review] БД недоступна:", error);
+    notFound();
+  }
 
   if (!submission) notFound();
-
-  const [files, issues] = await Promise.all([
-    db
-      .select()
-      .from(reviewFiles)
-      .where(eq(reviewFiles.submissionId, submission.id))
-      .orderBy(asc(reviewFiles.path)),
-    db
-      .select()
-      .from(findingsTable)
-      .where(eq(findingsTable.submissionId, submission.id))
-      .orderBy(asc(findingsTable.line)),
-  ]);
 
   const report = (submission.report as unknown as ReviewReport | null) ?? null;
 

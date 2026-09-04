@@ -8,32 +8,54 @@ import { SubmissionsTable, type SubmissionRow } from "@/components/submissions-t
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  const db = await getDb();
-  const rows = await db
-    .select({
-      publicId: submissions.publicId,
-      title: submissions.title,
-      author: submissions.author,
-      cohort: submissions.cohort,
-      language: submissions.language,
-      sourceKind: submissions.sourceKind,
-      status: submissions.status,
-      score: submissions.score,
-      complexity: submissions.complexity,
-      verdict: submissions.verdict,
-      engine: submissions.engine,
-      createdAt: submissions.createdAt,
-      // См. комментарий в api/submissions/route.ts: коррелированный
-      // подзапрос с ${submissions.id} drizzle квалифицирует неверно,
-      // поэтому считаем агрегаты через LEFT JOIN + GROUP BY по PK.
-      findingsCount: count(findings.id),
-      criticalCount: sql<number>`count(*) filter (where ${findings.severity} = 'critical')::int`,
-    })
-    .from(submissions)
-    .leftJoin(findings, eq(findings.submissionId, submissions.id))
-    .groupBy(submissions.id)
-    .orderBy(desc(submissions.createdAt))
-    .limit(60);
+  // Дашборд не должен падать с 500, если БД недоступна
+  // (например, не задан DATABASE_URL на свежем деплое).
+  let rows: Array<{
+    publicId: string;
+    title: string;
+    author: string;
+    cohort: string;
+    language: string;
+    sourceKind: string;
+    status: string;
+    score: number | null;
+    complexity: string | null;
+    verdict: string | null;
+    engine: string;
+    createdAt: Date;
+    findingsCount: number;
+    criticalCount: number;
+  }> = [];
+  try {
+    const db = await getDb();
+    rows = await db
+      .select({
+        publicId: submissions.publicId,
+        title: submissions.title,
+        author: submissions.author,
+        cohort: submissions.cohort,
+        language: submissions.language,
+        sourceKind: submissions.sourceKind,
+        status: submissions.status,
+        score: submissions.score,
+        complexity: submissions.complexity,
+        verdict: submissions.verdict,
+        engine: submissions.engine,
+        createdAt: submissions.createdAt,
+        // См. комментарий в api/submissions/route.ts: коррелированный
+        // подзапрос с ${submissions.id} drizzle квалифицирует неверно,
+        // поэтому считаем агрегаты через LEFT JOIN + GROUP BY по PK.
+        findingsCount: count(findings.id),
+        criticalCount: sql<number>`count(*) filter (where ${findings.severity} = 'critical')::int`,
+      })
+      .from(submissions)
+      .leftJoin(findings, eq(findings.submissionId, submissions.id))
+      .groupBy(submissions.id)
+      .orderBy(desc(submissions.createdAt))
+      .limit(60);
+  } catch (error) {
+    console.error("[dashboard] БД недоступна:", error);
+  }
 
   const serialized: SubmissionRow[] = rows.map((r) => ({
     ...r,

@@ -7,12 +7,25 @@ import { findings as findingsTable, reviewFiles, submissions } from "@/db/schema
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+function dbUnavailable() {
+  return NextResponse.json(
+    { error: "База данных недоступна. Задайте DATABASE_URL в переменных окружения Vercel и примените миграции (npx drizzle-kit push)." },
+    { status: 503 },
+  );
+}
+
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ publicId: string }> },
 ) {
   const { publicId } = await params;
-  const db = await getDb();
+  let db: Awaited<ReturnType<typeof getDb>>;
+  try {
+    db = await getDb();
+  } catch (error) {
+    console.error("[submission] БД недоступна:", error);
+    return dbUnavailable();
+  }
   const [submission] = await db
     .select()
     .from(submissions)
@@ -44,7 +57,13 @@ export async function DELETE(
   { params }: { params: Promise<{ publicId: string }> },
 ) {
   const { publicId } = await params;
-  const db = await getDb();
+  let db: Awaited<ReturnType<typeof getDb>>;
+  try {
+    db = await getDb();
+  } catch (error) {
+    console.error("[submission] БД недоступна:", error);
+    return dbUnavailable();
+  }
   const deleted = await db
     .delete(submissions)
     .where(eq(submissions.publicId, publicId))
