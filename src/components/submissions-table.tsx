@@ -1,5 +1,7 @@
 "use client";
 
+import { languageLabel } from "@/lib/languages";
+
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -21,13 +23,8 @@ export interface SubmissionRow {
   criticalCount: number;
 }
 
-const LANG_LABEL: Record<string, string> = {
-  c: "C",
-  cpp: "C++",
-  python: "Python",
-  mixed: "Mixed",
-  plaintext: "—",
-};
+const LANG_LABEL = (language: string): string =>
+  language === "plaintext" ? "—" : languageLabel(language);
 
 type SortKey = "date" | "score" | "findings";
 
@@ -52,6 +49,11 @@ export function SubmissionsTable({ rows }: { rows: SubmissionRow[] }) {
   const [sort, setSort] = useState<SortKey>("date");
   const [busy, setBusy] = useState<string | null>(null);
   const router = useRouter();
+
+  const availableLangs = useMemo(
+    () => Array.from(new Set(rows.map((r) => r.language))).filter((l) => l && l !== "plaintext").sort(),
+    [rows],
+  );
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -128,7 +130,7 @@ export function SubmissionsTable({ rows }: { rows: SubmissionRow[] }) {
         />
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex gap-1 rounded-lg border border-white/10 bg-ink-900/60 p-1">
-            {["all", "c", "cpp", "python"].map((value) => (
+            {["all", ...availableLangs].map((value) => (
               <button
                 key={value}
                 onClick={() => setLang(value)}
@@ -138,7 +140,7 @@ export function SubmissionsTable({ rows }: { rows: SubmissionRow[] }) {
                     : "text-slate-400 hover:text-slate-200"
                 }`}
               >
-                {value === "all" ? "Все языки" : LANG_LABEL[value]}
+                {value === "all" ? "Все языки" : LANG_LABEL(value)}
               </button>
             ))}
           </div>
@@ -227,7 +229,7 @@ export function SubmissionsTable({ rows }: { rows: SubmissionRow[] }) {
 
               <div className="flex flex-wrap items-center gap-2 text-xs">
                 <span className="rounded-md border border-white/10 bg-white/[0.04] px-2 py-1 font-mono text-slate-300">
-                  {LANG_LABEL[row.language] ?? row.language}
+                  {LANG_LABEL(row.language)}
                 </span>
                 <span className="rounded-md border border-violet-ray/25 bg-violet-ray/10 px-2 py-1 font-mono text-violet-200">
                   {row.complexity ?? "—"}

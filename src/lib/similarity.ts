@@ -10,13 +10,18 @@
  * для преподавателя («какие пары проверить вручную»).
  */
 
+import { languageFamily } from "@/lib/languages";
+
 function stripNoise(code: string, language: string): string {
   let s = code;
   // строковые и символьные литералы → плейсхолдер
   s = s.replace(/"(?:[^"\\\n]|\\.)*"/g, '"S"').replace(/'(?:[^'\\\n]|\\.)*'/g, "'C'");
   // комментарии
-  if (language === "python") {
+  const family = languageFamily(language);
+  if (family === "python-like" || family === "ruby-like") {
     s = s.replace(/"""[\s\S]*?"""/g, " ").replace(/#[^\n]*/g, " ");
+  } else if (language === "sql" || language === "haskell") {
+    s = s.replace(/--[^\n]*/g, " ").replace(/\/\*[\s\S]*?\*\//g, " ");
   } else {
     s = s.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/\/\/[^\n]*/g, " ");
   }
@@ -52,7 +57,9 @@ export function jaccard(a: Set<string>, b: Set<string>): number {
 }
 
 function languageGroup(language: string): string {
-  if (language === "c" || language === "cpp") return "c-like";
+  if (language === "c" || language === "cpp") return "c/cpp";
+  if (language === "javascript" || language === "typescript") return "js/ts";
+  if (language === "java" || language === "kotlin") return "jvm";
   return language;
 }
 

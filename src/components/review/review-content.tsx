@@ -11,6 +11,7 @@ import {
 import { ExportButtons } from "@/components/export-buttons";
 import { FixChecklist } from "@/components/fix-checklist";
 import { SimilarityCard } from "@/components/similarity-card";
+import { AIDetectionCard } from "@/components/ai-detection-card";
 import type { SimilarPair } from "@/lib/similarity";
 import type { ReviewReport } from "@/lib/types";
 
@@ -74,6 +75,13 @@ export function ReviewContent({
                 <Badge label="Читаемость" value={`${data.readability ?? "—"}/100`} />
                 <Badge label="Архитектура" value={`${data.architecture ?? "—"}/100`} />
                 <Badge label="Замечаний" value={String(data.findings.length)} />
+                {data.report?.aiDetection && (
+                  <Badge
+                    label="ИИ-генерация"
+                    value={`${data.report.aiDetection.probability}%`}
+                    danger={data.report.aiDetection.level === "high"}
+                  />
+                )}
                 {criticals > 0 && <Badge label="Критических" value={String(criticals)} danger />}
               </div>
             </div>
@@ -115,6 +123,11 @@ export function ReviewContent({
               </div>
             </div>
           </Reveal>
+          {data.report?.aiDetection && (
+            <Reveal delay={0.11}>
+              <AIDetectionCard report={data.report.aiDetection} />
+            </Reveal>
+          )}
           {similarPairs.length > 0 && (
             <Reveal delay={0.12}>
               <SimilarityCard pairs={similarPairs} />

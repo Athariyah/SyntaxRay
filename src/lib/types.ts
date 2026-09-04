@@ -1,4 +1,7 @@
 /** Общие типы домена СинтексПруф (используются и фронтом, и API-роутами). */
+import type { AIDetectionReport } from "@/lib/ai-detection";
+
+export type { AIDetectionReport, AIDetectionSignal, AIDetectionLevel } from "@/lib/ai-detection";
 
 export type Severity = "critical" | "major" | "minor" | "info";
 
@@ -68,4 +71,7 @@ export interface ReviewReport {
   sections: Array<{ title: string; body: string }>;
   sandbox: SandboxReport;
   engine: string;
+  /** Оценка вероятности ИИ-генерации кода (стилометрия + мнение LLM). */
+  aiDetection?: AIDetectionReport | null;
 }
+

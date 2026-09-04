@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import JSZip from "jszip";
 import { AnalysisProgress } from "@/components/analysis-progress";
-import { isAnalyzableFile } from "@/lib/languages";
+import { isAnalyzableFile, SUPPORTED_EXTENSIONS_HINT } from "@/lib/languages";
 import { saveReview } from "@/lib/review-cache";
 import type { ReviewContentData } from "@/components/review/review-content";
 
@@ -99,7 +99,7 @@ export function SubmitForm() {
         if (content.trim()) collected.push({ path: entry.name, content: content.slice(0, 120_000) });
       }
       if (collected.length === 0) {
-        setError("В архиве нет файлов .c/.cpp/.h/.hpp/.py");
+        setError(`В архиве нет исходников поддерживаемых языков (${SUPPORTED_EXTENSIONS_HINT})`);
         return;
       }
       setArchiveFiles(collected);
@@ -360,7 +360,7 @@ export function SubmitForm() {
                   <div className="text-3xl">🗂</div>
                   <p className="mt-3 text-sm text-slate-300">Перетащите .zip с проектом или нажмите для выбора</p>
                   <p className="mt-1 text-xs text-slate-500">
-                    Извлекаются только .c .h .cpp .hpp .py — служебные каталоги игнорируются
+                    Извлекаются исходники: {SUPPORTED_EXTENSIONS_HINT} — служебные каталоги игнорируются
                   </p>
 
                   {archiveFiles.length > 0 && (

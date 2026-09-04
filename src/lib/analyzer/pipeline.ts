@@ -10,6 +10,7 @@
 import { requestAIReview, getActiveModelName } from "@/lib/ai/providers";
 import type { DirectAIConfig } from "@/lib/ai/direct-config";
 import { runStaticAnalysis } from "@/lib/analyzer/static-engine";
+import { detectAIGeneratedCode, mergeWithLLMOpinion } from "@/lib/ai-detection";
 import type { AnalysisFinding, ReviewReport, SandboxReport, SourceFile } from "@/lib/types";
 
 /** Обращение к внешней песочнице (FastAPI). Падение → локальный движок. */
@@ -135,7 +136,8 @@ function heuristicReport(sandbox: SandboxReport, files: SourceFile[]): ReviewRep
       },
     ],
     sandbox,
-    engine: `${sandbox.engine} (без Gemini)`,
+    engine: `${sandbox.engine} (без ИИ)`,
+    aiDetection: detectAIGeneratedCode(files),
   };
 }
 
@@ -182,5 +184,6 @@ export async function analyzeSubmission(params: {
     sections: aiReview.sections,
     sandbox: { ...sandbox, findings: merged },
     engine: model || getActiveModelName(),
+    aiDetection: mergeWithLLMOpinion(detectAIGeneratedCode(params.files), aiReview.aiGenerated),
   };
 }
