@@ -1,7 +1,7 @@
 import { Reveal } from "@/components/reveal";
 import { SubmitForm } from "@/components/submit-form";
 
-export const metadata = { title: "Новое ревью — SyntaxRay" };
+export const metadata = { title: "Новое ревью — СинтексПруф" };
 
 export default function NewReviewPage() {
   return (

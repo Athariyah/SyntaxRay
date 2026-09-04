@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
+import { AuthButtons } from "@/components/auth-buttons";
 
 const NAV = [
   { href: "/", label: "Обзор" },
@@ -28,7 +29,7 @@ export function SiteHeader() {
           </span>
           <span className="flex flex-col leading-none">
             <span className="text-[15px] font-semibold tracking-tight text-slate-100">
-              Syntax<span className="text-ray-300">Ray</span>
+              Синтекс<span className="text-ray-300">Пруф</span>
             </span>
             <span className="mt-1 font-mono text-[10px] uppercase tracking-[0.18em] text-slate-500">
               static · ai · review
@@ -63,6 +64,9 @@ export function SiteHeader() {
         </nav>
 
         <div className="flex items-center gap-2">
+          <div className="hidden md:flex">
+            <AuthButtons />
+          </div>
           <Link
             href="/new"
             className="hidden rounded-lg bg-gradient-to-r from-ray-400 to-violet-ray px-4 py-2 text-sm font-medium text-ink-950 shadow-[0_0_30px_-8px_rgba(56,211,245,0.8)] transition-transform hover:scale-[1.03] active:scale-[0.98] sm:inline-block"
@@ -100,12 +104,22 @@ export function SiteHeader() {
               </Link>
             );
           })}
+          <div className="mt-3 flex items-center justify-center border-t border-white/5 pt-3">
+            <AuthButtons />
+          </div>
           <Link
             href="/new"
             onClick={() => setOpen(false)}
             className="mt-2 block rounded-lg bg-gradient-to-r from-ray-400 to-violet-ray px-3 py-2.5 text-center text-sm font-medium text-ink-950"
           >
             Загрузить код
+          </Link>
+          <Link
+            href="/login"
+            onClick={() => setOpen(false)}
+            className="mt-2 block rounded-lg border border-white/10 px-3 py-2.5 text-center text-sm text-slate-300"
+          >
+            Войти через Яндекс / VK / MAX / Госуслуги
           </Link>
         </nav>
       )}

@@ -42,7 +42,7 @@ function toMarkdown(params: {
     }
     lines.push(``);
   }
-  lines.push(`_Сгенерировано SyntaxRay · /review/${publicId}_`);
+  lines.push(`_Сгенерировано СинтексПруф · /review/${publicId}_`);
   return lines.join("\n");
 }
 

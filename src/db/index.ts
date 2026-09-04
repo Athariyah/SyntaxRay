@@ -3,7 +3,7 @@ import { drizzle as drizzleNodePg, type NodePgDatabase } from "drizzle-orm/node-
 import { Pool } from "pg";
 
 /**
- * Подключение к базе данных SyntaxRay.
+ * Подключение к базе данных СинтексПруф.
  *
  * Двухрежимное:
  *  - задан `DATABASE_URL` → production-путь, PostgreSQL (Neon / Supabase / Vercel Postgres);
@@ -22,6 +22,45 @@ import { Pool } from "pg";
 export type Db = NodePgDatabase;
 
 const INIT_SCHEMA_SQL = `
+CREATE TABLE IF NOT EXISTS users (
+  id serial PRIMARY KEY NOT NULL,
+  email varchar(320),
+  email_verified timestamp with time zone,
+  name varchar(120),
+  image text,
+  provider varchar(32),
+  provider_account_id varchar(128),
+  created_at timestamp with time zone DEFAULT now() NOT NULL,
+  updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+CREATE INDEX IF NOT EXISTS users_email_idx ON users(email);
+CREATE INDEX IF NOT EXISTS users_provider_idx ON users(provider, provider_account_id);
+
+CREATE TABLE IF NOT EXISTS accounts (
+  id serial PRIMARY KEY NOT NULL,
+  user_id integer NOT NULL REFERENCES users(id) ON DELETE cascade,
+  type varchar(32) DEFAULT 'oauth' NOT NULL,
+  provider varchar(32) NOT NULL,
+  provider_account_id varchar(128) NOT NULL,
+  refresh_token text,
+  access_token text,
+  expires_at integer,
+  token_type varchar(32),
+  scope text,
+  id_token text,
+  session_state text
+);
+CREATE INDEX IF NOT EXISTS accounts_user_idx ON accounts(user_id);
+CREATE INDEX IF NOT EXISTS accounts_provider_idx ON accounts(provider, provider_account_id);
+
+CREATE TABLE IF NOT EXISTS sessions (
+  id serial PRIMARY KEY NOT NULL,
+  session_token varchar(128) NOT NULL UNIQUE,
+  user_id integer NOT NULL REFERENCES users(id) ON DELETE cascade,
+  expires timestamp with time zone NOT NULL
+);
+CREATE INDEX IF NOT EXISTS sessions_user_idx ON sessions(user_id);
+
 CREATE TABLE IF NOT EXISTS submissions (
   id serial PRIMARY KEY NOT NULL,
   public_id varchar(32) NOT NULL UNIQUE,
@@ -40,6 +79,7 @@ CREATE TABLE IF NOT EXISTS submissions (
   summary text,
   report jsonb,
   engine varchar(48) DEFAULT 'heuristic-engine' NOT NULL,
+  user_id integer REFERENCES users(id) ON DELETE set null,
   duration_ms real,
   created_at timestamp with time zone DEFAULT now() NOT NULL,
   completed_at timestamp with time zone
@@ -71,6 +111,15 @@ CREATE TABLE IF NOT EXISTS findings (
 CREATE INDEX IF NOT EXISTS findings_submission_idx ON findings(submission_id);
 CREATE INDEX IF NOT EXISTS review_files_submission_idx ON review_files(submission_id);
 CREATE INDEX IF NOT EXISTS submissions_created_at_idx ON submissions(created_at);
+CREATE INDEX IF NOT EXISTS submissions_user_idx ON submissions(user_id);
+
+-- Миграция для существующих БД (добавит колонку если таблицы уже созданы)
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='submissions' AND column_name='user_id') THEN
+    ALTER TABLE submissions ADD COLUMN user_id integer REFERENCES users(id) ON DELETE set null;
+    CREATE INDEX IF NOT EXISTS submissions_user_idx ON submissions(user_id);
+  END IF;
+END $$;
 `;
 
 function isLocalPostgres(url: string): boolean {
@@ -127,11 +176,35 @@ async function createEmbeddedDb(): Promise<Db> {
   return drizzlePgLite(fallback) as unknown as Db;
 }
 
+function resolveDatabaseUrl(): string | undefined {
+  // Vercel Postgres может прокидывать POSTGRES_URL / POSTGRES_PRISMA_URL
+  // вместо DATABASE_URL — поддерживаем все варианты, чтобы деплой не падал
+  // с «База данных недоступна» при корректно подключённом Vercel Postgres.
+  const candidates = [
+    process.env.DATABASE_URL,
+    process.env.POSTGRES_URL,
+    process.env.POSTGRES_PRISMA_URL,
+    process.env.POSTGRES_URL_NON_POOLING,
+  ];
+  for (const c of candidates) {
+    const v = c?.trim();
+    if (v) return v;
+  }
+  return undefined;
+}
+
 /** Создать клиент Drizzle поверх выбранного движка. */
 async function createDb(): Promise<Db> {
-  const databaseUrl = process.env.DATABASE_URL?.trim();
+  const databaseUrl = resolveDatabaseUrl();
   if (databaseUrl) {
     return createPostgresDb(databaseUrl);
+  }
+  // На Vercel без внешней БД предупреждаем явно — PGlite в /tmp эфемерен.
+  if (process.env.VERCEL) {
+    console.warn(
+      "[db] DATABASE_URL/POSTGRES_URL не задан — используется эфемерная PGlite в /tmp. " +
+        "Для продакшена задайте DATABASE_URL в Vercel Environment Variables.",
+    );
   }
   return createEmbeddedDb();
 }

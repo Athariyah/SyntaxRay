@@ -24,7 +24,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from .analyzers import analyze_workspace, detect_language
-from .gemini import is_configured, review_with_gemini
+from .gemini import is_configured as is_gemini_configured, review_with_gemini
+from .gigachat import is_configured as is_gigachat_configured, review_with_gigachat
+from .yandexgpt import is_configured as is_yandex_configured, review_with_yandexgpt
 from .sandbox import materialize, run_in_container
 
 logging.basicConfig(level=logging.INFO)
@@ -35,9 +37,9 @@ MAX_TOTAL_CHARS = 400_000
 ALLOWED_SUFFIXES = {".c", ".h", ".cpp", ".cc", ".cxx", ".hpp", ".hh", ".py"}
 
 app = FastAPI(
-    title="SyntaxRay Sandbox API",
-    version="1.0.0",
-    description="Изолированный статический анализ и академическое ИИ-ревью кода на C/C++/Python.",
+    title="СинтексПруф Sandbox API",
+    version="2.0.0",
+    description="Изолированный статический анализ и академическое ИИ-ревью кода на C/C++/Python. Поддержка YandexGPT, GigaChat, Gemini.",
 )
 
 app.add_middleware(
@@ -125,7 +127,14 @@ async def health() -> dict[str, Any]:
         docker_ok = True
     except Exception:  # noqa: BLE001 — health не должен падать
         docker_ok = False
-    return {"status": "ok", "docker": docker_ok, "gemini": is_configured()}
+    return {
+        "status": "ok",
+        "docker": docker_ok,
+        "gemini": is_gemini_configured(),
+        "gigachat": is_gigachat_configured(),
+        "yandexgpt": is_yandex_configured(),
+        "ai_provider": os.getenv("AI_PROVIDER", "auto"),
+    }
 
 
 @app.post("/api/sandbox/analyze", dependencies=[Depends(verify_token)])
@@ -169,18 +178,40 @@ async def sandbox_upload(archive: Annotated[UploadFile, File()]) -> dict[str, An
 
 @app.post("/api/review", dependencies=[Depends(verify_token)])
 async def full_review(payload: ReviewRequest) -> dict[str, Any]:
-    """Полный конвейер: изолированный анализ → академическое ревью Gemini."""
+    """Полный конвейер: изолированный анализ → ревью (YandexGPT → GigaChat → Gemini)."""
     files = _validate(payload.files)
     sandbox = _analyze(files)
-    gemini = await review_with_gemini(payload.title, payload.language, files, sandbox)
 
-    if gemini is None:
+    provider_order = []
+    pref = os.getenv("AI_PROVIDER", "auto").lower()
+    if pref in ("gigachat", "yandexgpt", "yandex", "gemini"):
+        provider_order = [pref if pref != "yandex" else "yandexgpt"]
+    else:
+        # auto: российские первыми
+        provider_order = ["gigachat", "yandexgpt", "gemini"]
+
+    review = None
+    engine = sandbox["engine"]
+    for prov in provider_order:
+        try:
+            if prov == "gigachat" and is_gigachat_configured():
+                review = await review_with_gigachat(payload.title, payload.language, files, sandbox)
+                engine = os.getenv("GIGACHAT_MODEL", "GigaChat")
+            elif prov in ("yandexgpt", "yandex") and is_yandex_configured():
+                review = await review_with_yandexgpt(payload.title, payload.language, files, sandbox)
+                engine = os.getenv("YANDEXGPT_MODEL", "yandexgpt")
+            elif prov == "gemini" and is_gemini_configured():
+                review = await review_with_gemini(payload.title, payload.language, files, sandbox)
+                engine = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+            if review is not None:
+                break
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Провайдер %s упал: %s", prov, exc)
+
+    if review is None:
         return {"engine": sandbox["engine"], "sandbox": sandbox, "review": None}
 
-    # Слияние: находки Gemini имеют приоритет, дубли по «файл:строка» убираются.
-    seen = {(f["filePath"], f["line"]) for f in gemini["findings"]}
-    merged = gemini["findings"] + [
-        f for f in sandbox["findings"] if (f["filePath"], f["line"]) not in seen
-    ]
+    seen = {(f["filePath"], f["line"]) for f in review["findings"]}
+    merged = review["findings"] + [f for f in sandbox["findings"] if (f["filePath"], f["line"]) not in seen]
     sandbox["findings"] = merged[:140]
-    return {"engine": os.getenv("GEMINI_MODEL", "gemini-2.5-flash"), "sandbox": sandbox, "review": gemini}
+    return {"engine": engine, "sandbox": sandbox, "review": review}

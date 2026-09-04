@@ -81,7 +81,7 @@ export function CodeViewer({
           endColumn: model.getLineMaxColumn(endLine),
           severity: SEVERITY_TO_MONACO[m.severity],
           message: `${m.title}\n\n${m.message}${m.suggestion ? `\n\nКак исправить: ${m.suggestion}` : ""}`,
-          source: m.origin === "gemini" ? "SyntaxRay · Gemini" : "SyntaxRay · Static",
+          source: m.origin === "gemini" ? "СинтексПруф · Gemini" : "СинтексПруф · Static",
         };
       }),
     );

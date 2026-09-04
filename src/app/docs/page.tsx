@@ -1,30 +1,41 @@
 import { Reveal } from "@/components/reveal";
 
-export const metadata = { title: "Документация — SyntaxRay" };
+export const metadata = { title: "Документация — СинтексПруф" };
 
 const ENV_VARS = [
-  ["GEMINI_API_KEY", "Ключ Google AI Studio. Без него платформа работает на детерминированном движке.", "обязательно для ИИ-ревью"],
-  ["GEMINI_MODEL", "Модель Gemini (по умолчанию gemini-2.5-flash).", "опционально"],
   ["DATABASE_URL", "Строка подключения PostgreSQL (Neon/Supabase/Vercel Postgres).", "обязательно"],
+  ["AI_PROVIDER", "auto | gigachat | yandexgpt | gemini | heuristic. При auto — приоритет GigaChat → YandexGPT → Gemini.", "опционально"],
+  ["GIGACHAT_CLIENT_ID / SECRET / AUTH_KEY", "Ключи GigaChat (Сбер). GIGACHAT_SCOPE=GIGACHAT_API_PERS, модель GigaChat.", "опционально"],
+  ["YANDEX_API_KEY + YANDEX_FOLDER_ID", "Yandex Cloud Foundation Models — YANDEXGPT_MODEL=yandexgpt.", "опционально"],
+  ["GEMINI_API_KEY", "Ключ Google AI Studio. Фолбэк, если российские не настроены.", "опционально"],
+  ["GEMINI_MODEL", "Модель Gemini (по умолчанию gemini-2.5-flash).", "опционально"],
+  ["NEXTAUTH_SECRET", "Секрет для подписи сессий (32+ символа).", "обязательно для входа"],
+  ["NEXTAUTH_URL", "Базовый URL (https://...). На Vercel — авто.", "обязательно для OAuth"],
+  ["YANDEX_CLIENT_ID / SECRET", "OAuth для Яндекс ID (https://oauth.yandex.ru).", "опционально"],
+  ["VK_CLIENT_ID / SECRET", "VK ID — https://id.vk.com.", "опционально"],
+  ["MAX_CLIENT_ID / SECRET", "MAX мессенджер — OAuth. Выдаётся партнёрам VK.", "опционально"],
+  ["GOSUSLUGI_CLIENT_ID / SECRET", "Госуслуги ЕСИА — требует ГОСТ в проде, демо без подписи.", "опционально"],
   ["SANDBOX_API_URL", "Базовый URL FastAPI-раннера с Docker-песочницей.", "опционально"],
   ["SANDBOX_API_TOKEN", "Bearer-токен для защиты раннера.", "опционально"],
   ["GITHUB_TOKEN", "Повышает лимиты GitHub API при импорте репозиториев.", "опционально"],
 ];
 
-const TREE = `syntaxray/
+const TREE = `sinteksproof/
 ├─ src/                          # Next.js фронтенд (Vercel)
 │  ├─ app/
 │  │  ├─ page.tsx                # Лендинг
+│  │  ├─ login/page.tsx          # Вход через Яндекс/VK/MAX/Госуслуги
 │  │  ├─ dashboard/page.tsx      # Дашборд преподавателя
 │  │  ├─ new/page.tsx            # Загрузка кода
 │  │  ├─ review/[publicId]/      # Ревью + Monaco Editor
 │  │  ├─ docs/page.tsx           # Эта страница
 │  │  └─ api/
 │  │     ├─ health/route.ts
+│  │     ├─ auth/                # Yandex / VK / MAX / Госуслуги
 │  │     └─ submissions/         # CRUD + запуск пайплайна
 │  ├─ components/
-│  │  ├─ site-header.tsx         # Навигация (Framer Motion)
-│  │  ├─ page-transition.tsx     # Переходы между страницами
+│  │  ├─ site-header.tsx         # Навигация + AuthButtons
+│  │  ├─ auth-buttons.tsx        # Кнопки входа через РФ-провайдеры
 │  │  ├─ submit-form.tsx         # ZIP / repo / paste
 │  │  ├─ analysis-progress.tsx   # Skeleton-загрузчик ИИ
 │  │  └─ review/
@@ -32,17 +43,21 @@ const TREE = `syntaxray/
 │  │     ├─ code-viewer.tsx      # Monaco + маркеры
 │  │     └─ score-ring.tsx
 │  ├─ lib/
-│  │  ├─ ai/system-prompt.ts     # Академический промпт
-│  │  ├─ ai/gemini.ts            # Клиент Gemini API
+│  │  ├─ ai/
+│  │  │  ├─ system-prompt.ts     # Академический промпт
+│  │  │  ├─ providers/           # gigachat.ts, yandexgpt.ts, common.ts
+│  │  │  └─ gemini.ts            # Фолбэк Gemini
+│  │  ├─ auth/                   # config.ts, jwt.ts, oauth.ts
 │  │  ├─ analyzer/static-engine.ts
-│  │  ├─ analyzer/pipeline.ts    # Оркестратор
-│  │  ├─ languages.ts, repo.ts, types.ts
-│  └─ db/                        # Drizzle ORM (PostgreSQL)
+│  │  ├─ analyzer/pipeline.ts    # Оркестратор (auto: Gigachat→Yandex→Gemini)
+│  │  └─ languages.ts, repo.ts, types.ts
+│  └─ db/                        # users, accounts, sessions, submissions
 ├─ backend/                      # FastAPI + Docker sandbox
-│  ├─ app/main.py                # REST API
+│  ├─ app/main.py                # REST API (+ /auth для РФ-провайдеров)
 │  ├─ app/sandbox.py             # Управление контейнерами
 │  ├─ app/analyzers.py           # gcc / cppcheck / valgrind / ruff
-│  ├─ app/gemini.py              # Серверная интеграция Gemini
+│  ├─ app/gigachat.py            # Интеграция GigaChat
+│  ├─ app/yandexgpt.py           # Интеграция YandexGPT
 │  ├─ app/prompts.py             # Системный промпт (Python-копия)
 │  ├─ Dockerfile                 # Образ API
 │  ├─ sandbox.Dockerfile         # Образ песочницы (toolchain)
@@ -54,7 +69,7 @@ const TREE = `syntaxray/
 const CODE_BLOCKS: Array<{ title: string; code: string }> = [
   {
     title: "1. Локальный запуск фронтенда",
-    code: `git clone <repo> && cd syntaxray
+    code: `git clone <repo> && cd sinteksproof
 cp .env.example .env.local
 npm install
 npx drizzle-kit push     # создать таблицы в PostgreSQL
@@ -63,7 +78,7 @@ npm run dev              # http://localhost:3000`,
   {
     title: "2. Запуск бэкенда и песочницы",
     code: `# сборка образа песочницы с тулчейном C/C++/Python
-docker build -t syntaxray/sandbox:latest -f backend/sandbox.Dockerfile backend
+docker build -t sinteksproof/sandbox:latest -f backend/sandbox.Dockerfile backend
 
 # поднять API + Postgres
 docker compose up --build
@@ -106,7 +121,7 @@ export default function DocsPage() {
       <Reveal>
         <h1 className="text-3xl font-semibold tracking-tight">Документация и развёртывание</h1>
         <p className="mt-2 text-slate-400">
-          Архитектура SyntaxRay, переменные окружения, конфигурация Docker и публикация на Vercel.
+          Архитектура СинтексПруф, переменные окружения, конфигурация Docker и публикация на Vercel.
         </p>
       </Reveal>
 

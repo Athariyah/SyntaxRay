@@ -1,6 +1,16 @@
 {
-  "name": "nextjs-postgresql-template",
+  "name": "sinteksproof",
+  "description": "СинтексПруф — автоматизированное академическое ревью кода с поддержкой российских нейросетей (YandexGPT, Gigachat) и авторизацией через Яндекс/VK/MAX/Госуслуги",
   "private": true,
+  "engines": {
+    "node": ">=20"
+  },
+  "allowScripts": {
+    "esbuild": true,
+    "sharp": true,
+    "unrs-resolver": true,
+    "fsevents": true
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",

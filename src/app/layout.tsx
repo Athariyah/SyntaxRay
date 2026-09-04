@@ -5,9 +5,9 @@ import { PageTransition } from "@/components/page-transition";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "SyntaxRay — автоматизированное академическое ревью кода",
+  title: "СинтексПруф — автоматизированное академическое ревью кода",
   description:
-    "Платформа статического анализа и ИИ-ревью кода на C, C++ и Python: утечки памяти, асимптотическая сложность, архитектура и читаемость.",
+    "СинтексПруф — платформа статического анализа и ИИ-ревью кода на C, C++ и Python с поддержкой российских нейросетей (YandexGPT, Gigachat, GigaChat). Вход через Яндекс, VK, MAX, Госуслуги.",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
@@ -20,7 +20,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           <footer className="border-t border-white/5 px-6 py-8 text-xs text-slate-500">
             <div className="mx-auto flex max-w-7xl flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <span>
-                SyntaxRay · движок статического анализа + Gemini · песочница Docker (network=none)
+                СинтексПруф · статический анализ + YandexGPT · Gigachat · песочница Docker (network=none)
               </span>
               <span className="font-mono text-slate-600">C · C++ · Python 3</span>
             </div>
