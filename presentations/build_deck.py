@@ -2,9 +2,10 @@
 """Build the SyntaxProof / DGU TechNet pitch deck from the supplied PDF template.
 
 Content is intentionally conservative: estimates from the source pitch, project
-plans, and facts proven by the supplied material are kept distinct. All newly
-written text and tables remain editable in PowerPoint; template artwork is a
-rasterised background because the supplied template is a PDF rather than PPTX.
+plans, and facts from the PDFs and the additional project questionnaire image
+are kept distinct. Questionnaire details are transcribed below, not read at
+runtime. All newly written text and tables remain editable in PowerPoint;
+template artwork is a rasterised background because the template is a PDF.
 
 Usage:
     python presentations/build_deck.py \
@@ -255,10 +256,12 @@ def make_deck(deck: Deck, mvp: Path) -> None:
     deck.start(0)
     deck.text(48, 172, 520, 'ПРОЕКТ АКСЕЛЕРАТОРА ДГУ  /  TECHNET', size=13.5, color='#E4CBFA', bold=True)
     deck.text(48, 229, 700, 'СинтексПруф', size=44, color=WHITE, bold=True)
-    deck.text(50, 297, 665, 'Платформа статического анализа\nи ИИ-ревью программного кода', size=20, color=WHITE, leading=1.34)
+    deck.text(50, 294, 671, 'Облачная система семантического анализа\n'
+              'и ИИ-ревью исходного кода\nдля образовательных учреждений',
+              size=18.5, color=WHITE, leading=1.24, max_lines=3)
     deck.text(49, 452, 640, 'Исмаилов Ислам Шафикович', size=16, color=WHITE, bold=True)
-    deck.text(49, 481, 740, 'StevenScreamches@ya.ru    •    +7 (928) 218-30-30', size=13.2, color=WHITE)
-    deck.footer('Источник: «Акселератор.pdf», с. 1, 6  •  Программа ДГУ TechNet',
+    deck.text(49, 481, 740, 'aldarfgfg@gmail.com    •    +7 (928) 218-30-30', size=13.2, color=WHITE)
+    deck.footer('Источники: анкета проекта (приложенное изображение); «Акселератор.pdf», с. 1, 6.',
                 color='#DDD2E9', x=49, y=519, size=8.2)
 
     # 2 — problem / pain points: keep the template's purple outline.
@@ -313,9 +316,12 @@ def make_deck(deck: Deck, mvp: Path) -> None:
         deck.text(67, y + 19, 25, number, size=12, color=WHITE, bold=True, align='center')
         deck.text(109, y + 9, 400, heading, size=15.5, bold=True)
         deck.text(109, y + 33, 410, detail, size=12.6, color=MUTED)
-    deck.text(50, 460, 502, 'Стек из питча: React / Next.js • Python / FastAPI • Docker',
-              size=11.3, color=PLUM)
-    deck.footer('Источник стека: «Акселератор.pdf», с. 5; схема — представление продукта из питча.', size=8.2)
+    deck.text(50, 458, 516, 'Стек: React / Next.js • Python / FastAPI • Docker',
+              size=11.1, color=PLUM)
+    deck.text(50, 477, 517, 'По анкете: системы обработки больших данных, ML и ИИ.\n'
+              'Сквозная технология — технологии искусственного интеллекта.',
+              size=10.2, color=PLUM, leading=1.17, max_lines=2)
+    deck.footer('Стек: «Акселератор.pdf», с. 5; классификация технологий — анкета проекта.', size=8.0)
 
     # 5 — comparison grounded in official product descriptions, not benchmark claims.
     deck.start(4)
@@ -367,35 +373,45 @@ def make_deck(deck: Deck, mvp: Path) -> None:
     # 6 — segmentation and *hypothesis* of pricing, not a fabricated TAM/SOM.
     deck.start(5)
     deck.text(48, 131, 705, 'Кто использует и кто может платить', size=20.7, bold=True)
-    deck.card(48, 177, 564, 83, 'TechNet  /  ИТ-команды',
-              'Первичный фильтр перед ручным ревью; покупатель — руководитель разработки.',
-              title_size=16.2, body_size=12.8, title_y=10, body_y=38)
-    deck.card(48, 270, 564, 83, 'EduNet  /  преподаватели',
-              'Потоковая проверка работ и понятная обратная связь обучающимся.',
+    deck.card(48, 177, 564, 83, 'Образовательные учреждения  /  EduNet',
+              'Проверка кода студентов и понятная обратная связь преподавателю.',
+              title_size=15.4, body_size=12.8, title_y=10, body_y=38)
+    deck.card(48, 270, 564, 83, 'ИТ-команды  /  рынок TechNet',
+              'Первичный фильтр до ручного Code Review для руководителя разработки.',
               title_size=16.2, body_size=12.8, title_y=10, body_y=38)
     deck.card(48, 363, 564, 83, 'HR  /  обучающие программы',
               'Разбор тестовых заданий и сопоставимая оценка решений кандидатов.',
               title_size=16.2, body_size=12.8, title_y=10, body_y=38)
-    deck.rect(48, 459, 591, 42, fill='#F3E6FC', line=BORDER, rounded=True)
-    deck.text(61, 469, 571, 'Гипотеза: B2B/B2Edu-подписка; цену и размер рынка уточнят пилоты.',
+    deck.rect(48, 459, 564, 42, fill='#F3E6FC', line=BORDER, rounded=True)
+    deck.text(61, 469, 540, 'Гипотеза: B2B/B2Edu-подписка; цену и размер рынка уточнят пилоты.',
               size=12.1, color=PLUM, bold=True)
-    deck.footer('Сегменты из «Акселератор.pdf», с. 4; модель оплаты — гипотеза, не факт продаж.', y=516, size=8.2)
+    deck.footer('Фокус на образовании и рынок TechNet — анкета проекта; модель оплаты — гипотеза.', y=516, size=8.2)
 
-    # 7 — only the named contact is presented as a team member; no invented CV.
+    # 7 — all five participants, their roles, positions and both IDs are
+    # transcribed from the separately supplied project questionnaire image.
     deck.start(6)
-    deck.text(49, 135, 613, 'В исходных материалах указан один контакт проекта',
-              size=17.2, bold=True)
-    deck.rect(49, 184, 536, 138, fill=WHITE, line=BORDER)
-    deck.text(67, 200, 488, 'Исмаилов Ислам Шафикович', size=21.2, bold=True)
-    deck.text(67, 234, 490, 'Контакт проекта «СинтексПруф»', size=15.2, color=PLUM)
-    deck.text(67, 264, 494, 'StevenScreamches@ya.ru\n+7 (928) 218-30-30',
-              size=13.2, color=MUTED, leading=1.34)
-    deck.card(49, 341, 536, 105, 'Компетенции для усиления',
-              'Инженерия анализа кода · ИИ/ML · продукт и B2B-пилоты',
-              title_size=16.2, body_size=13.2, title_y=11, body_y=44)
-    deck.text(51, 461, 548, 'Вуз, курс, опыт и полный состав команды в источниках не приведены.',
-              size=11.4, color=MUTED)
-    deck.footer('Источник контактов: «Акселератор.pdf», с. 6. Роли для усиления — предложение.', size=8.2)
+    deck.text(49, 133, 597, 'Команда проекта: 5 участников', size=18.2, bold=True)
+    deck.text(49, 164, 393, 'Лидер: aldarfgfg@gmail.com  •  +7 (928) 218-30-30',
+              size=11.2, color=PLUM)
+    deck.text(434, 177, 170, 'UnTI ID / Leader ID', size=8.8, color=MUTED, align='right')
+    team = [
+        ('Исмаилов Ислам Шафикович', 'Руководитель проекта', 'Тимлид', 'U2579564', '7124087'),
+        ('Яхьяев Абдуллах Закарьяевич', 'Технический специалист', 'Бэкенд-разработчик', 'U2579613', '7675623'),
+        ('Загиров Алимагомед Мурадович', 'Бизнес-аналитик', 'Продуктовый аналитик', 'U1836974', '4870356'),
+        ('Омаров Алиасхаб Рабаданович', 'Технический специалист', 'Бэкенд-разработчик', 'U2579569', '7369083'),
+        ('Магомедов Руслан Шамильевич', 'Дизайнер', 'Фронтенд-разработчик, UX/UI дизайнер', 'U2579575', '7688556'),
+    ]
+    for index, (name, role, position, unti_id, leader_id) in enumerate(team):
+        y = 194 + index * 61
+        deck.rect(49, y, 564, 55, fill=WHITE, line=BORDER)
+        deck.rect(61, y + 10, 4, 35, fill=PURPLE, rounded=False)
+        deck.text(74, y + 6, 355, name, size=13.5, bold=True, max_lines=1)
+        deck.text(433, y + 9, 166, f'{unti_id} / {leader_id}',
+                  size=9.9, color=PLUM, align='right', max_lines=1)
+        deck.text(74, y + 31, 524, f'{role}  ·  {position}',
+                  size=11.1, color=MUTED, max_lines=1)
+    deck.footer('Источник: анкета проекта (приложенное изображение); вуз, курс и опыт не указаны.',
+                y=516, size=8.2)
 
     # 8 — do NOT mistake illustrative brand logos in the old pitch for partners.
     deck.start(7)
@@ -523,7 +539,7 @@ def make_deck(deck: Deck, mvp: Path) -> None:
               size=14.2, color=WHITE, bold=True)
     deck.text(55, 465, 485, 'Исмаилов Ислам Шафикович',
               size=12.8, color='#F4E9FC', bold=True)
-    deck.text(55, 488, 470, 'StevenScreamches@ya.ru  •  +7 (928) 218-30-30',
+    deck.text(55, 488, 470, 'aldarfgfg@gmail.com  •  +7 (928) 218-30-30',
               size=11.5, color='#F4E9FC')
     deck.footer('Требования к экспертизе: «Шаблон презентации 2.0_2026.pdf», с. 13.',
                 x=55, y=517, size=8.0, color='#D8C7E3')
